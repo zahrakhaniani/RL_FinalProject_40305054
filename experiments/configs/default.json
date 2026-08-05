@@ -1,0 +1,12 @@
+{
+  "rows": 10,
+  "cols": 10,
+  "wall_density": 0.25,
+  "seed": 42,
+  "gamma": 0.99,
+  "alpha": 0.1,
+  "epsilon": 1.0,
+  "epsilon_decay": 0.995,
+  "lambda": 0.9,
+  "episodes": 500
+}
