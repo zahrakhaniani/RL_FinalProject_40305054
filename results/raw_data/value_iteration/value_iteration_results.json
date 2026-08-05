@@ -1,8 +1,8 @@
 {
   "run": {
-    "timestamp_utc": "2026-07-29T22:19:32+00:00",
+    "timestamp_utc": "2026-07-29T21:40:57+00:00",
     "config_file": "experiments/configs/default.json",
-    "config_hash": "3d29f3ca91",
+    "config_hash": "c5942d0702",
     "python": "3.13.9",
     "platform": "Windows-11-10.0.26200-SP0",
     "numpy": "2.3.5",
@@ -21,27 +21,16 @@
         "theta": 1e-10,
         "reward_mode": "sparse",
         "max_energy": 225,
-        "n_cells": 138,
-        "value_table_shape": [
-          138,
-          2,
-          226
-        ],
-        "value_table_kilobytes": 487.3,
-        "memory_kilobytes": 548.2
+        "n_cells": 138
       },
-      "train_seconds": 0.023754400000143505,
+      "train_seconds": 0.024536699999771372,
       "train_stats": {
         "algorithm": "value_iteration",
         "reward_mode": "sparse",
         "gamma": 0.99,
-        "theta": 1e-10,
-        "iterations": 225,
         "energy_sweeps": 225,
-        "converged": true,
         "states_evaluated": 62100,
-        "train_seconds": 0.023754400000143505,
-        "memory_kilobytes": 548.2,
+        "train_seconds": 0.024536699999771372,
         "bellman_residual": 1.4210854715202004e-14,
         "max_delta_per_sweep": [
           89.95000000000002,
@@ -273,18 +262,16 @@
         "start_state_value": 34.311660899761065
       },
       "final_eval": {
-        "episodes": 50,
+        "episodes": 300,
         "success_rate": 1.0,
         "key_rate": 1.0,
-        "mean_return": 104.052,
-        "std_return": 0.33763293678194195,
-        "mean_steps": 118.96,
-        "mean_steps_when_solved": 118.96,
-        "mean_energy_left": 106.04,
-        "mean_wall_collisions": 20.6,
-        "mean_penalty_entries": 4.22,
+        "mean_return": 104.17,
+        "std_return": 0.3442140806726708,
+        "mean_steps": 116.6,
+        "mean_steps_when_solved": 116.6,
+        "mean_energy_left": 108.4,
         "outcomes": {
-          "success": 50
+          "success": 300
         }
       },
       "example_trajectory": {
@@ -1205,27 +1192,16 @@
         "theta": 1e-10,
         "reward_mode": "shaped",
         "max_energy": 225,
-        "n_cells": 138,
-        "value_table_shape": [
-          138,
-          2,
-          226
-        ],
-        "value_table_kilobytes": 487.3,
-        "memory_kilobytes": 548.2
+        "n_cells": 138
       },
-      "train_seconds": 0.023944200000187266,
+      "train_seconds": 0.024578999999903317,
       "train_stats": {
         "algorithm": "value_iteration",
         "reward_mode": "shaped",
         "gamma": 0.99,
-        "theta": 1e-10,
-        "iterations": 225,
         "energy_sweeps": 225,
-        "converged": true,
         "states_evaluated": 62100,
-        "train_seconds": 0.023944200000187266,
-        "memory_kilobytes": 548.2,
+        "train_seconds": 0.024578999999903317,
         "bellman_residual": 1.4210854715202004e-14,
         "max_delta_per_sweep": [
           87.0,
@@ -1457,18 +1433,16 @@
         "start_state_value": 34.74640988807971
       },
       "final_eval": {
-        "episodes": 50,
+        "episodes": 300,
         "success_rate": 1.0,
         "key_rate": 1.0,
-        "mean_return": 107.05899999999998,
-        "std_return": 8.317461692126994,
-        "mean_steps": 119.22,
-        "mean_steps_when_solved": 119.22,
-        "mean_energy_left": 105.78,
-        "mean_wall_collisions": 20.38,
-        "mean_penalty_entries": 4.22,
+        "mean_return": 108.63483333333332,
+        "std_return": 9.583766394563023,
+        "mean_steps": 116.70333333333333,
+        "mean_steps_when_solved": 116.70333333333333,
+        "mean_energy_left": 108.29666666666667,
         "outcomes": {
-          "success": 50
+          "success": 300
         }
       },
       "example_trajectory": {

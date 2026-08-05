@@ -4,13 +4,11 @@ Reinforcement learning on a 16x16 stochastic maze with a key, a locked door,
 penalty cells and a limited energy budget. Three algorithms are implemented from
 scratch on top of NumPy only — no RL libraries:
 
-
-| algorithm       | family                                           | uses the transition model?           |
-| --------------- | ------------------------------------------------ | ------------------------------------ |
-| Value Iteration | model-based, dynamic programming                 | yes, the exact 0.8 / 0.1 / 0.1 model |
-| Q-Learning      | model-free, off-policy TD                        | no, samples only                     |
-| SARSA(lambda)   | model-free, on-policy TD with eligibility traces | no, samples only                     |
-
+| algorithm | family | uses the transition model? |
+| --- | --- | --- |
+| Value Iteration | model-based, dynamic programming | yes, the exact 0.8 / 0.1 / 0.1 model |
+| Q-Learning | model-free, off-policy TD | no, samples only |
+| SARSA(lambda) | model-free, on-policy TD with eligibility traces | no, samples only |
 
 A fourth study transfers a learned Q-table to a second, differently shaped maze.
 
@@ -71,21 +69,19 @@ The viewer animates greedy episodes under the real stochastic dynamics, so you
 can watch the agent slip. It loads trained models from `results/models/` when
 they exist and trains on the spot when they do not.
 
-
-| key         | action                                       |
-| ----------- | -------------------------------------------- |
-| `space`     | play / pause                                 |
-| `n`         | single step                                  |
-| `r`         | restart the episode                          |
+| key | action |
+| --- | --- |
+| `space` | play / pause |
+| `n` | single step |
+| `r` | restart the episode |
 | `1` `2` `3` | Value Iteration / Q-Learning / SARSA(lambda) |
-| `m`         | switch sparse <-> shaped rewards             |
-| `v`         | optimal-value heat map                       |
-| `p`         | policy arrows                                |
-| `t`         | trail                                        |
-| `+` `-`     | speed                                        |
-| `c`         | start / stop recording frames                |
-| `esc`       | quit                                         |
-
+| `m` | switch sparse <-> shaped rewards |
+| `v` | optimal-value heat map |
+| `p` | policy arrows |
+| `t` | trail |
+| `+` `-` | speed |
+| `c` | start / stop recording frames |
+| `esc` | quit |
 
 Recorded frames land in `results/videos/<algorithm>/run_<timestamp>/`. To turn
 them into a video with an external tool:
@@ -94,11 +90,7 @@ them into a video with an external tool:
 ffmpeg -framerate 30 -i frame_%05d.png -pix_fmt yuv420p run.mp4
 ```
 
-
-
 ## The environment
-
-
 
 ### Seed rule
 
@@ -113,18 +105,16 @@ with the full student id, so the map is byte-identical on every machine.
 
 ### Generated maze
 
-
-| property       | value                                         |
-| -------------- | --------------------------------------------- |
-| size           | 16 x 16                                       |
-| walls          | 118 / 256 = **46.1%** (minimum required: 15%) |
-| passable cells | 138                                           |
-| penalty cells  | **8** (minimum required: 5)                   |
-| start          | `(1, 1)`                                      |
-| key            | `(11, 15)`                                    |
-| locked door    | `(15, 12)`                                    |
-| goal           | `(13, 15)`, inside a sealed 3x3 vault         |
-
+| property | value |
+| --- | --- |
+| size | 16 x 16 |
+| walls | 118 / 256 = **46.1%** (minimum required: 15%) |
+| passable cells | 138 |
+| penalty cells | **8** (minimum required: 5) |
+| start | `(1, 1)` |
+| key | `(11, 15)` |
+| locked door | `(15, 12)` |
+| goal | `(13, 15)`, inside a sealed 3x3 vault |
 
 The goal sits in a corner room whose every other border cell is a wall, so the
 door is the only way in. BFS validates that the key is reachable from the start
@@ -151,15 +141,13 @@ distribution.
 
 ### Episode budgets
 
-
-| quantity          | value        | where it comes from                     |
-| ----------------- | ------------ | --------------------------------------- |
-| `d(start -> key)` | 36           | BFS with the door shut                  |
-| `d(key -> goal)`  | 54           | BFS with the door open                  |
-| optimal path      | **90** steps | 36 + 54                                 |
-| `max_steps`       | **414**      | `max(200, 3 x 138 passable cells)`      |
-| `max_energy`      | **225**      | `ceil(2.5 x 90)`, capped at `max_steps` |
-
+| quantity | value | where it comes from |
+| --- | --- | --- |
+| `d(start -> key)` | 36 | BFS with the door shut |
+| `d(key -> goal)` | 54 | BFS with the door open |
+| optimal path | **90** steps | 36 + 54 |
+| `max_steps` | **414** | `max(200, 3 x 138 passable cells)` |
+| `max_energy` | **225** | `ceil(2.5 x 90)`, capped at `max_steps` |
 
 Both are stored in `experiments/configs/default.json` (as `null`, meaning
 "derive from the maze") and in the saved map file. `max_energy <= max_steps` is
@@ -177,25 +165,21 @@ Both modes are implemented and every experiment runs on both.
 
 **Sparse** — only the three base terms:
 
-
-| term      | value |
-| --------- | ----- |
+| term | value |
+| --- | --- |
 | step cost | -0.05 |
-| key       | +10   |
-| goal      | +100  |
-
+| key | +10 |
+| goal | +100 |
 
 **Shaped** — the same base terms plus:
 
-
-| term                      | value                                      |
-| ------------------------- | ------------------------------------------ |
-| progress shaping          | `0.5 x (distance_before - distance_after)` |
-| wall / boundary collision | -1                                         |
-| locked-door attempt       | -1                                         |
-| penalty cell              | -5                                         |
-| energy exhausted          | -20                                        |
-
+| term | value |
+| --- | --- |
+| progress shaping | `0.5 x (distance_before - distance_after)` |
+| wall / boundary collision | -1 |
+| locked-door attempt | -1 |
+| penalty cell | -5 |
+| energy exhausted | -20 |
 
 The shaping target is the key while `has_key == 0` and the goal afterwards,
 measured as BFS distance, so moving closer is rewarded and moving away is
@@ -212,29 +196,25 @@ because it wastes a unit of energy.
 Averaged over 5 seeds, 300 greedy evaluation episodes each. Full tables are in
 `results/raw_data/comparison_summary.csv`.
 
-
-| algorithm       | rewards | success   | return | steps | energy left |
-| --------------- | ------- | --------- | ------ | ----- | ----------- |
-| Value Iteration | sparse  | **1.000** | 104.2  | 116.6 | 108.4       |
-| Value Iteration | shaped  | **1.000** | 108.6  | 116.7 | 108.3       |
-| Q-Learning      | sparse  | 0.011     | -0.2   | 224.8 | 0.2         |
-| Q-Learning      | shaped  | **1.000** | 97.7   | 174.1 | 50.9        |
-| SARSA(lambda)   | sparse  | 0.983     | 98.3   | 200.1 | 24.9        |
-| SARSA(lambda)   | shaped  | **1.000** | 98.3   | 177.4 | 47.6        |
-
+| algorithm | rewards | success | return | steps | energy left |
+| --- | --- | --- | --- | --- | --- |
+| Value Iteration | sparse | **1.000** | 104.2 | 116.6 | 108.4 |
+| Value Iteration | shaped | **1.000** | 108.6 | 116.7 | 108.3 |
+| Q-Learning | sparse | 0.011 | -0.2 | 224.8 | 0.2 |
+| Q-Learning | shaped | **1.000** | 97.7 | 174.1 | 50.9 |
+| SARSA(lambda) | sparse | 0.983 | 98.3 | 200.1 | 24.9 |
+| SARSA(lambda) | shaped | **1.000** | 98.3 | 177.4 | 47.6 |
 
 Three things stand out, and `report.md` discusses them in detail:
 
 1. Value Iteration is optimal and effectively instant (0.02 s) because it owns
-  the model and because energy makes the MDP acyclic — one backward pass over
+   the model and because energy makes the MDP acyclic — one backward pass over
    the energy dimension is exact. The Bellman residual is ~1e-14.
 2. With shaped rewards both learners reach a 100% success rate but take ~50%
-  more steps than optimal; they find a reliable route, not the best one.
+   more steps than optimal; they find a reliable route, not the best one.
 3. With sparse rewards Q-Learning collapses to ~1% while SARSA(lambda) still
-  reaches 98%. The eligibility traces carry the single terminal reward back
+   reaches 98%. The eligibility traces carry the single terminal reward back
    across the whole episode, which one-step Q-Learning cannot do at this horizon.
-
-
 
 ### Figures
 
@@ -254,8 +234,6 @@ results/figures/
     ├── algorithm_comparison.png
     └── learning_vs_optimal.png
 ```
-
-
 
 ## Project layout
 
@@ -296,21 +274,18 @@ RL_FinalProject_40305054/
 └── README.md
 ```
 
-
-
 ## Design notes
 
 - **Energy in the tabular state.** Value Iteration uses the exact state, all
-`138 x 2 x 226` of them. The two learners would need a table row per energy
-level, which experience can never fill, so they bucket energy into
-`energy_bins` (8 by default) groups. This is the only difference between what
-the planner and the learners see, and it is recorded in every saved model.
+  `138 x 2 x 226` of them. The two learners would need a table row per energy
+  level, which experience can never fill, so they bucket energy into
+  `energy_bins` (8 by default) groups. This is the only difference between what
+  the planner and the learners see, and it is recorded in every saved model.
 - **Truncation is not termination.** Episodes cut off by `max_steps` are
-bootstrapped normally rather than treated as absorbing, since the limit is an
-experiment-level convenience, not part of the MDP.
+  bootstrapped normally rather than treated as absorbing, since the limit is an
+  experiment-level convenience, not part of the MDP.
 - **Eligibility traces are sparse.** Traces decay by `gamma * lambda`, so only a
-short window matters. They are kept in compact NumPy arrays and pruned below a
-threshold, making a trace update a couple of vector operations instead of a
-full-table sweep. A test verifies the sparse store is numerically identical to
-a dense trace vector.
-
+  short window matters. They are kept in compact NumPy arrays and pruned below a
+  threshold, making a trace update a couple of vector operations instead of a
+  full-table sweep. A test verifies the sparse store is numerically identical to
+  a dense trace vector.

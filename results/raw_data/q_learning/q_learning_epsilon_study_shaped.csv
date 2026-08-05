@@ -1,5 +1,0 @@
-algorithm,reward_mode,seed,label,episodes,success_rate,key_rate,mean_return,std_return,mean_steps,mean_steps_when_solved,mean_energy_left,mean_wall_collisions,mean_penalty_entries,episodes_to_threshold,late_eval_success_std,late_return_std,memory_kilobytes,train_seconds,epsilon_schedule
-q_learning,shaped,1,shaped_eps-exponential_seed1,300,0.0,0.0,-82.31999999999985,7.634140423125539,225.0,,0.0,50.1,0.14,,0.0,25.527870920819225,132.0,1.1442502999998396,exponential
-q_learning,shaped,2,shaped_eps-exponential_seed2,300,0.0,0.0,-85.86999999999988,9.474470961483764,225.0,,0.0,54.76,0.0,,0.0,22.28629399429176,132.0,0.9525303999998869,exponential
-q_learning,shaped,1,shaped_eps-linear_seed1,300,0.0,1.0,-82.29999999999987,6.9894563450957685,225.0,,0.0,68.22,2.7,,0.0,22.13791247498278,132.0,1.0520116000006965,linear
-q_learning,shaped,2,shaped_eps-linear_seed2,300,0.0,1.0,-64.89,15.019999999999962,225.0,,0.0,59.72,2.94,,0.0,17.207490919654646,132.0,0.9207084000008763,linear

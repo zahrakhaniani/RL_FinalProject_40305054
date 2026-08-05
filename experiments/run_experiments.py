@@ -18,14 +18,13 @@ import paths
 from experiments import (
     analysis,
     common,
-    run_comparison,
     run_q_learning,
     run_sarsa_lambda,
     run_transfer,
     run_value_iteration,
 )
 
-STAGES = ("value_iteration", "q_learning", "sarsa_lambda", "comparison", "transfer")
+STAGES = ("value_iteration", "q_learning", "sarsa_lambda", "transfer")
 
 QUICK_OVERRIDES = {
     "episodes": 300,
@@ -39,7 +38,7 @@ QUICK_OVERRIDES = {
 
 
 def apply_quick(config: dict) -> dict:
-    """Shrink every loop so the whole pipeline runs in a couple of minutes."""
+    """Shrink every loop so the whole pipeline runs in well under a minute."""
     config["training"]["eval_every"] = QUICK_OVERRIDES["eval_every"]
     config["training"]["eval_episodes"] = QUICK_OVERRIDES["eval_episodes"]
     config["training"]["final_eval_episodes"] = QUICK_OVERRIDES["final_eval_episodes"]
@@ -59,8 +58,6 @@ def main(argv=None) -> None:
     parser.add_argument(
         "--only", nargs="*", choices=STAGES, default=None, help="run a subset of stages"
     )
-    parser.add_argument("--skip-sweeps", action="store_true",
-                        help="skip the gamma, epsilon and lambda studies")
     parser.add_argument("--skip-analysis", action="store_true")
     parser.add_argument("--regenerate-map", action="store_true")
     args = parser.parse_args(argv)
@@ -76,41 +73,26 @@ def main(argv=None) -> None:
     stages = args.only or STAGES
     reward_modes = config["reward_modes"]
     seeds = config["training"]["seeds"]
-    sweeps = not args.skip_sweeps
     started = time.perf_counter()
 
     if "value_iteration" in stages:
-        common.banner("1/5  Value Iteration (model-based)")
+        common.banner("1/4  Value Iteration (model-based)")
         run_value_iteration.run(config, reward_modes)
-        if sweeps:
-            common.banner("1/5  Value Iteration -- discount factor sweep")
-            run_value_iteration.run_gamma_sweep(config, reward_modes)
 
     if "q_learning" in stages:
-        common.banner("2/5  Q-Learning (model-free, off-policy)")
+        common.banner("2/4  Q-Learning (model-free, off-policy)")
         run_q_learning.run(config, reward_modes, seeds)
-        if sweeps:
-            for reward_mode in reward_modes:
-                common.banner(f"2/5  Q-Learning -- epsilon decay comparison ({reward_mode})")
-                run_q_learning.run_epsilon_study(config, reward_mode, seeds)
 
     if "sarsa_lambda" in stages:
-        common.banner("3/5  SARSA(lambda) (model-free, on-policy)")
+        common.banner("3/4  SARSA(lambda) (model-free, on-policy)")
         run_sarsa_lambda.run(config, reward_modes, seeds)
-        if sweeps:
-            for reward_mode in reward_modes:
-                common.banner(f"3/5  SARSA(lambda) -- lambda sweep ({reward_mode} rewards)")
-                run_sarsa_lambda.run_lambda_sweep(config, reward_mode=reward_mode)
-
-    if "comparison" in stages:
-        common.banner("4/5  Algorithm comparison and policy agreement")
-        run_comparison.run(config, reward_modes, seeds)
+        for reward_mode in reward_modes:
+            common.banner(f"3/4  SARSA(lambda) -- lambda sweep ({reward_mode} rewards)")
+            run_sarsa_lambda.run_lambda_sweep(config, reward_mode=reward_mode)
 
     if "transfer" in stages:
-        common.banner("5/5  Transfer learning (Q-Learning only)")
-        payload = run_transfer.run_transfer_study(config, verbose=True)
-        common.save_json(payload, common.raw_path("transfer", "transfer_results.json"))
-        run_transfer.summarise(payload)
+        common.banner("4/4  Transfer learning")
+        run_transfer.run(config, reward_mode="shaped")
 
     if not args.skip_analysis:
         common.banner("Analysis: figures and comparison tables")

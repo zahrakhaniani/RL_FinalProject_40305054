@@ -30,8 +30,7 @@
   "reward_modes": ["sparse", "shaped"],
   "value_iteration": {
     "gamma": 0.99,
-    "theta": 1e-10,
-    "gamma_sweep": [0.90, 0.95, 0.99]
+    "theta": 1e-10
   },
   "q_learning": {
     "episodes": 3000,
@@ -40,11 +39,7 @@
     "epsilon_start": 1.0,
     "epsilon_end": 0.05,
     "epsilon_decay": 0.998,
-    "epsilon_schedule": "exponential",
-    "epsilon_decay_episodes": null,
-    "energy_bins": 8,
-    "q_log_every": 500,
-    "q_log_max": 500
+    "energy_bins": 8
   },
   "sarsa_lambda": {
     "episodes": 3000,
@@ -53,8 +48,6 @@
     "epsilon_start": 1.0,
     "epsilon_end": 0.05,
     "epsilon_decay": 0.998,
-    "epsilon_schedule": "exponential",
-    "epsilon_decay_episodes": null,
     "energy_bins": 8,
     "lam": 0.7,
     "replacing_traces": true
@@ -66,18 +59,15 @@
     "eval_seed": 555000,
     "final_eval_episodes": 300
   },
-  "lambda_sweep": [0.0, 0.3, 0.7, 0.9],
-  "epsilon_schedules": ["exponential", "linear"],
+  "lambda_sweep": [0.0, 0.3, 0.5, 0.7, 0.9],
   "transfer": {
-    "variants": ["similar", "different"],
-    "variant_seed": 87654321,
+    "target_seed": 87654321,
     "episodes": 1500,
     "seeds": [1, 2, 3],
-    "scenarios": ["scratch", "full", "scaled", "selective"],
-    "betas": [0.25, 0.5, 0.75],
-    "neighbourhood_radius": 1,
-    "success_threshold": 0.8,
-    "early_window": 300,
-    "reward_mode": "shaped"
+    "strategies": ["scratch", "warm_start", "policy_reuse"],
+    "transfer_weight": 1.0,
+    "psi_start": 0.8,
+    "psi_decay": 0.995,
+    "success_threshold": 0.8
   }
 }

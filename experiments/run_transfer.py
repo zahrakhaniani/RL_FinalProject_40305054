@@ -1,7 +1,6 @@
-"""Experiment: transfer learning with Q-Learning.
+"""Experiment: transfer learning from the original maze to a new one.
 
     python experiments/run_transfer.py
-    python experiments/run_transfer.py --episodes 200
 """
 
 from __future__ import annotations
@@ -16,84 +15,92 @@ import pandas as pd
 
 import paths
 from experiments import common
-from transfer.transfer_learning import run_transfer_study  # noqa: F401  (re-exported)
+from transfer.transfer_learning import run_transfer_study
 
 ALGORITHM = "transfer"
 
-SUMMARY_COLUMNS = (
-    "variant",
-    "scenario",
-    "beta",
-    "seed",
-    "episodes",
-    "zero_shot_success",
-    "zero_shot_return",
-    "early_success",
-    "early_return",
-    "episodes_to_threshold",
-    "final_success",
-    "final_return",
-    "final_steps",
-    "jumpstart_delta",
-    "early_delta",
-    "final_delta",
-    "speed_delta",
-    "verdict",
-    "q_shift_mean_abs",
-    "train_seconds",
-)
 
-
-def summarise(payload: dict, verbose: bool = True) -> pd.DataFrame:
-    frame = pd.DataFrame(
-        [{key: record.get(key) for key in SUMMARY_COLUMNS} for record in payload["records"]]
-    )
+def summarise(records) -> pd.DataFrame:
+    rows = []
+    for record in records:
+        evaluation = record["final_eval"]
+        metrics = record["transfer_metrics"]
+        rows.append(
+            {
+                "strategy": record["strategy"],
+                "reward_mode": record["reward_mode"],
+                "seed": record["seed"],
+                "episodes": record["episodes"],
+                "zero_shot_success": metrics["zero_shot_success"],
+                "zero_shot_key_rate": metrics["zero_shot_key_rate"],
+                "zero_shot_return": metrics["zero_shot_return"],
+                "first_eval_success": metrics["jumpstart_success"],
+                "episodes_to_threshold": metrics["episodes_to_threshold"],
+                "mean_eval_success": metrics["mean_eval_success"],
+                "final_success_rate": evaluation["success_rate"],
+                "final_mean_return": evaluation["mean_return"],
+                "final_mean_steps": evaluation["mean_steps"],
+                "train_seconds": record["train_seconds"],
+            }
+        )
+    frame = pd.DataFrame(rows)
+    # "never reached the threshold" is stored as None; make it a real NaN so the
+    # column stays numeric and aggregates sensibly.
     frame["episodes_to_threshold"] = pd.to_numeric(
         frame["episodes_to_threshold"], errors="coerce"
     )
-    frame.to_csv(common.raw_path(ALGORITHM, "transfer_summary.csv"), index=False)
+    return frame
 
-    averaged = (
-        frame.groupby(["variant", "scenario"])[
-            [
-                "zero_shot_success",
-                "early_success",
-                "final_success",
-                "episodes_to_threshold",
-                "final_delta",
-                "early_delta",
-            ]
-        ]
-        .mean()
-        .round(3)
-    )
-    averaged["verdict"] = (
-        frame.groupby(["variant", "scenario"])["verdict"]
-        .agg(lambda values: values.mode().iat[0])
-    )
-    averaged.to_csv(common.raw_path(ALGORITHM, "transfer_by_scenario.csv"))
 
+def run(config: dict, reward_mode: str, seeds=None, episodes=None, verbose=True) -> dict:
+    payload = run_transfer_study(
+        config, reward_mode=reward_mode, seeds=seeds, episodes=episodes, verbose=verbose
+    )
+    common.save_json(payload, common.raw_path(ALGORITHM, f"{ALGORITHM}_results.json"))
+
+    frame = summarise(payload["records"])
+    frame.to_csv(common.raw_path(ALGORITHM, f"{ALGORITHM}_summary.csv"), index=False)
     if verbose:
         print()
-        print("mean over seeds, per target and scenario:")
-        print(averaged.to_string())
-    return frame
+        print(frame.to_string(index=False))
+        print()
+        print("mean over seeds:")
+        print(
+            frame.groupby("strategy")[
+                [
+                    "zero_shot_success",
+                    "zero_shot_key_rate",
+                    "mean_eval_success",
+                    "episodes_to_threshold",
+                    "final_success_rate",
+                    "final_mean_return",
+                ]
+            ]
+            .mean()
+            .to_string()
+        )
+    return payload
 
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Run the transfer learning experiment")
     parser.add_argument("--config", default=None, help="path to a config JSON file")
-    parser.add_argument("--episodes", type=int, default=None, help="target episodes per run")
+    parser.add_argument("--reward-mode", default="shaped")
+    parser.add_argument("--seeds", nargs="*", type=int, default=None)
+    parser.add_argument("--episodes", type=int, default=None)
     args = parser.parse_args(argv)
 
     paths.ensure_dirs()
     config = common.load_config(args.config)
     common.ensure_map(config, verbose=False)
 
-    common.banner("Transfer learning (Q-Learning only)")
-    payload = run_transfer_study(config, episodes=args.episodes, verbose=True)
-    common.save_json(payload, common.raw_path(ALGORITHM, "transfer_results.json"))
-    summarise(payload)
+    common.banner("Transfer learning (source maze -> new maze)")
+    run(
+        config,
+        reward_mode=args.reward_mode,
+        seeds=args.seeds,
+        episodes=args.episodes,
+    )
 
 
 if __name__ == "__main__":

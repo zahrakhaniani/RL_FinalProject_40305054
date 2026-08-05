@@ -19,6 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import pandas as pd
+
 import paths
 from experiments import common
 
@@ -77,7 +79,7 @@ def run_lambda_sweep(
                     seed=seed,
                     overrides={"lam": lam},
                     episodes=episodes,
-                    tag=f"sweep_{reward_mode}_lam{lam}_seed{seed}",
+                    tag=f"sweep_lam{lam}_seed{seed}",
                     verbose=verbose,
                 )
             )
@@ -98,15 +100,7 @@ def run_lambda_sweep(
         print()
         print(f"lambda sweep, {reward_mode} rewards (mean over seeds):")
         print(
-            frame.groupby("lam")[
-                [
-                    "success_rate",
-                    "mean_return",
-                    "mean_steps",
-                    "episodes_to_threshold",
-                    "late_return_std",
-                ]
-            ]
+            frame.groupby("lam")[["success_rate", "mean_return", "mean_steps"]]
             .mean()
             .to_string()
         )

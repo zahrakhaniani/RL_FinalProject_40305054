@@ -10,11 +10,11 @@ of vector operations regardless of table size.
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 
-from agents.base import TabularAgent, TrainingLog, evaluate_policy, log_episode
+from agents.base import TabularAgent, TrainingLog, evaluate_policy
 from environments.maze import State
 
 
@@ -89,7 +89,6 @@ class SarsaLambdaAgent(TabularAgent):
         super().__init__(*args, **kwargs)
         self.lam = float(lam)
         self.replacing_traces = bool(replacing_traces)
-        self._traces: Optional[EligibilityTraces] = None
 
     def hyperparameters(self) -> Dict[str, float]:
         params = super().hyperparameters()
@@ -107,18 +106,53 @@ class SarsaLambdaAgent(TabularAgent):
     ) -> TrainingLog:
         log = TrainingLog()
         base = self.seed * 1_000_003 if episode_seed_base is None else episode_seed_base
+        q_flat = self.q.ravel()
+        traces = EligibilityTraces(
+            decay=self.gamma * self.lam, replacing=self.replacing_traces
+        )
         started = time.perf_counter()
 
         for episode in range(1, episodes + 1):
-            result = self.run_episode(episode, episodes, base + episode)
-            log_episode(
-                log,
-                self.env,
-                episode,
-                self.epsilon,
-                self.alpha,
-                td_errors=result["td_errors"],
-                trace_counts=result["trace_counts"],
+            state = self.env.reset(seed=base + episode)
+            action = self.get_action(state, greedy=False)
+            traces.clear()
+            total_reward = 0.0
+            done = False
+
+            while not done:
+                next_state, reward, done, info = self.env.step(action)
+                terminal = info["success"] or info["energy_exhausted"]
+
+                if terminal:
+                    next_action = None
+                    next_q = 0.0
+                else:
+                    next_action = self.get_action(next_state, greedy=False)
+                    next_q = float(self.q[self.feature(next_state) + (next_action,)])
+
+                current = self.feature(state) + (action,)
+                delta = reward + self.gamma * next_q - float(self.q[current])
+
+                traces.bump(self.flat_index(current))
+                traces.apply(q_flat, self.alpha * delta)
+                traces.decay_all()
+
+                total_reward += reward
+                state = next_state
+                if next_action is None:
+                    break
+                action = next_action
+
+            self.decay_epsilon()
+            self.training_episodes += 1
+            log.add_episode(
+                episode=episode,
+                reward=total_reward,
+                steps=self.env.steps,
+                success=self.env.outcome == "success",
+                energy_left=self.env.energy,
+                epsilon=self.epsilon,
+                outcome=self.env.outcome or "unknown",
             )
 
             if eval_every and episode % eval_every == 0:
@@ -133,73 +167,3 @@ class SarsaLambdaAgent(TabularAgent):
 
         self.train_seconds = time.perf_counter() - started
         return log
-
-    @property
-    def traces(self) -> EligibilityTraces:
-        if self._traces is None:
-            self._traces = EligibilityTraces(
-                decay=self.gamma * self.lam, replacing=self.replacing_traces
-            )
-        return self._traces
-
-    def run_episode(
-        self,
-        episode: int,
-        total_episodes: int,
-        seed: int,
-        record: bool = False,
-    ) -> dict:
-        """One episode of learning, traces included.
-
-        Split out from ``train`` so the GUI can drive training one episode at a
-        time and animate what the agent actually did, using the same code path as
-        the batch experiments.
-        """
-        q_flat = self.q.ravel()
-        traces = self.traces
-        traces.clear()
-
-        state = self.env.reset(seed=seed)
-        self.record_visit(state)
-        action = self.get_action(state, greedy=False)
-        deltas: List[float] = []
-        trace_counts: List[int] = []
-        path: List[Tuple[State, Optional[dict]]] = [(state, None)] if record else []
-        done = False
-
-        while not done:
-            next_state, reward, done, info = self.env.step(action)
-            terminal = info["success"] or info["energy_exhausted"]
-
-            if terminal:
-                next_action = None
-                next_q = 0.0
-            else:
-                next_action = self.get_action(next_state, greedy=False)
-                next_q = float(self.q[self.feature(next_state) + (next_action,)])
-
-            current = self.feature(state) + (action,)
-            delta = reward + self.gamma * next_q - float(self.q[current])
-
-            traces.bump(self.flat_index(current))
-            traces.apply(q_flat, self.alpha * delta)
-            traces.decay_all()
-
-            deltas.append(delta)
-            trace_counts.append(traces.size)
-            if record:
-                path.append((next_state, info))
-            state = next_state
-            self.record_visit(state)
-            if next_action is None:
-                break
-            action = next_action
-
-        self.update_epsilon(episode, total_episodes)
-        self.training_episodes += 1
-        return {
-            "td_errors": deltas,
-            "trace_counts": trace_counts,
-            "path": path,
-            "outcome": self.env.outcome,
-        }

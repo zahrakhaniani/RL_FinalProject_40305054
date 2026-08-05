@@ -1,3 +1,3 @@
-algorithm,reward_mode,seed,label,episodes,success_rate,key_rate,mean_return,std_return,mean_steps,mean_steps_when_solved,mean_energy_left,mean_wall_collisions,mean_penalty_entries,episodes_to_threshold,late_eval_success_std,late_return_std,memory_kilobytes,train_seconds
-value_iteration,sparse,,sparse,0,1.0,1.0,104.052,0.33763293678194195,118.96,118.96,106.04,20.6,4.22,,,,,0.023754400000143505
-value_iteration,shaped,,shaped,0,1.0,1.0,107.05899999999998,8.317461692126994,119.22,119.22,105.78,20.38,4.22,,,,,0.023944200000187266
+algorithm,reward_mode,seed,label,episodes,success_rate,key_rate,mean_return,std_return,mean_steps,mean_steps_when_solved,mean_energy_left,train_seconds
+value_iteration,sparse,,sparse,0,1.0,1.0,104.17,0.3442140806726708,116.6,116.6,108.4,0.024536699999771372
+value_iteration,shaped,,shaped,0,1.0,1.0,108.63483333333332,9.583766394563023,116.70333333333333,116.70333333333333,108.29666666666667,0.024578999999903317
