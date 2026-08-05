@@ -1,0 +1,5 @@
+algorithm,reward_mode,seed,label,episodes,success_rate,key_rate,mean_return,std_return,mean_steps,mean_steps_when_solved,mean_energy_left,mean_wall_collisions,mean_penalty_entries,episodes_to_threshold,late_eval_success_std,late_return_std,memory_kilobytes,train_seconds
+sarsa_lambda,sparse,1,sparse_seed1,300,0.0,0.0,-11.250000000000025,0.0,225.0,,0.0,142.78,25.54,,0.0,1.7763568394002505e-15,132.0,1.2088635999998587
+sarsa_lambda,sparse,2,sparse_seed2,300,0.0,0.02,-11.050000000000026,1.4000000000000024,225.0,,0.0,145.98,14.28,,0.0,1.7763568394002505e-15,132.0,1.2684101000004375
+sarsa_lambda,shaped,1,shaped_seed1,300,0.0,0.08,-107.54999999999967,17.51199588853309,225.0,,0.0,81.64,0.32,,0.0,31.14513244473393,132.0,1.306636399999661
+sarsa_lambda,shaped,2,shaped_seed2,300,0.0,0.0,-139.04999999999964,9.96343314324939,225.0,,0.0,114.64,0.0,,0.0,29.72026917778527,132.0,1.3329391999996005

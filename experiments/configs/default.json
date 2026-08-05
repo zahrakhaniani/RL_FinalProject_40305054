@@ -1,12 +1,83 @@
 {
-  "rows": 10,
-  "cols": 10,
-  "wall_density": 0.25,
-  "seed": 42,
-  "gamma": 0.99,
-  "alpha": 0.1,
-  "epsilon": 1.0,
-  "epsilon_decay": 0.995,
-  "lambda": 0.9,
-  "episodes": 500
+  "student_id": "40305054",
+  "maze": {
+    "seed": 40305054,
+    "size": null,
+    "min_wall_fraction": 0.15,
+    "n_penalty_cells": 8,
+    "loop_openings": 12,
+    "vault_span": 3,
+    "energy_slack": 2.5
+  },
+  "episode": {
+    "max_energy": null,
+    "max_steps": null
+  },
+  "dynamics": {
+    "p_intended": 0.8,
+    "p_slip": 0.1
+  },
+  "rewards": {
+    "step_cost": -0.05,
+    "key_reward": 10.0,
+    "goal_reward": 100.0,
+    "shaping_scale": 0.5,
+    "wall_collision": -1.0,
+    "locked_door": -1.0,
+    "penalty_cell": -5.0,
+    "energy_exhausted": -20.0
+  },
+  "reward_modes": ["sparse", "shaped"],
+  "value_iteration": {
+    "gamma": 0.99,
+    "theta": 1e-10,
+    "gamma_sweep": [0.90, 0.95, 0.99]
+  },
+  "q_learning": {
+    "episodes": 3000,
+    "alpha": 0.15,
+    "gamma": 0.99,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.05,
+    "epsilon_decay": 0.998,
+    "epsilon_schedule": "exponential",
+    "epsilon_decay_episodes": null,
+    "energy_bins": 8,
+    "q_log_every": 500,
+    "q_log_max": 500
+  },
+  "sarsa_lambda": {
+    "episodes": 3000,
+    "alpha": 0.1,
+    "gamma": 0.99,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.05,
+    "epsilon_decay": 0.998,
+    "epsilon_schedule": "exponential",
+    "epsilon_decay_episodes": null,
+    "energy_bins": 8,
+    "lam": 0.7,
+    "replacing_traces": true
+  },
+  "training": {
+    "seeds": [1, 2, 3, 4, 5],
+    "eval_every": 100,
+    "eval_episodes": 30,
+    "eval_seed": 555000,
+    "final_eval_episodes": 300
+  },
+  "lambda_sweep": [0.0, 0.3, 0.7, 0.9],
+  "epsilon_schedules": ["exponential", "linear"],
+  "transfer": {
+    "variants": ["similar", "different"],
+    "variant_seed": 87654321,
+    "episodes": 1500,
+    "seeds": [1, 2, 3],
+    "scenarios": ["scratch", "full", "scaled", "selective"],
+    "betas": [0.25, 0.5, 0.75],
+    "neighbourhood_radius": 1,
+    "success_threshold": 0.8,
+    "early_window": 300,
+    "reward_mode": "shaped"
+  }
 }

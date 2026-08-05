@@ -1,114 +1,234 @@
+"""Single entry point for the project.
+
+    python main.py info                     # config, maze stats, energy budgets
+    python main.py generate                 # (re)build the shared maze
+    python main.py demo                     # greedy episode per algorithm, in the console
+    python main.py train --algorithm q_learning
+    python main.py experiments              # full suite, then figures and tables
+    python main.py experiments --quick      # small smoke run
+    python main.py analyze                  # rebuild figures from saved results
+    python main.py gui                      # interactive pygame viewer
+    python main.py test                     # unit tests
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
 import sys
-import os
-import numpy as np
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from environments.generator import MazeGenerator
-from environments.maze import MazeEnv, Action
-from agents.value_iteration import ValueIterationAgent
-from agents.q_learning import QLearningAgent
-from agents.sarsa_lambda import SarsaLambdaAgent
+import paths
+from agents.base import evaluate_policy, rollout
+from experiments import common
 
-STUDENT_ID = "40305054"
+ALGORITHMS = ("value_iteration", "q_learning", "sarsa_lambda")
 
 
-def print_maze(env):
+def command_info(args) -> None:
+    config = common.load_config(args.config)
+    env = common.build_env(config, reward_mode="shaped")
+    metadata = env.metadata
+
+    print("Configuration")
+    print(f"  config file        {config['_config_file']}")
+    print(f"  student id         {config['student_id']}")
+    print(f"  base_seed          {metadata['base_seed']}  (= int(student_id[-2]))")
+    print(f"  maze size          {metadata['size']}x{metadata['size']}"
+          f"  (= 15 + base_seed % 4)")
+    print(f"  layout seed        {metadata['layout_seed']}")
+    print()
+    print("Maze")
+    print(f"  walls              {metadata['n_wall_cells']}/{metadata['size'] ** 2}"
+          f" = {metadata['wall_fraction']:.1%}  (minimum {metadata['min_wall_fraction']:.0%})")
+    print(f"  passable cells     {metadata['n_passable_cells']}")
+    print(f"  penalty cells      {metadata['n_penalty_cells']}  (minimum 5)")
+    print(f"  start / key        {env.start} / {env.key}")
+    print(f"  door / goal        {env.door} / {env.goal}")
+    print()
+    print("Episode budgets")
+    print(f"  d(start -> key)    {metadata['d_start_key']}")
+    print(f"  d(key -> goal)     {metadata['d_key_goal']}")
+    print(f"  optimal path       {metadata['optimal_path_length']} steps")
+    print(f"  max_steps          {env.max_steps}"
+          f"  (= max(200, 3 x {metadata['n_passable_cells']} passable cells))")
+    print(f"  max_energy         {env.max_energy}"
+          f"  (= ceil({metadata['energy_slack']} x optimal path), capped at max_steps)")
+    print()
+    print("Dynamics")
+    print(f"  intended action    {env.p_intended}")
+    print(f"  each slip          {env.p_slip}")
+    print()
+    print("Rewards")
+    for name, value in env.rewards.items():
+        print(f"  {name:<20} {value:>8}")
+    print()
     env.render()
 
 
-def run_agent_path(env, agent, label):
-    env.reset()
-    state = env._get_state()
-    steps = 0
-    path = [state[:2]]
-
-    while not env.done and steps < 500:
-        action = agent.get_action(state)
-        state, reward, done, _ = env.step(action)
-        path.append(state[:2])
-        steps += 1
-
-    print(f"\n=== {label} ===")
-    print(f"Path ({steps} steps): {path}")
-    print(f"Has key: {env.has_key}, Door open: {env.door_open}")
-    print_maze(env)
-    return steps, env.agent_pos == env.goal
+def command_generate(args) -> None:
+    config = common.load_config(args.config)
+    paths.ensure_dirs()
+    common.ensure_map(config, force=True, verbose=True)
 
 
-def demo_value_iteration(env):
-    agent = ValueIterationAgent(env.copy(), gamma=0.99)
-    iters = agent.train()
-    print(f"Converged in {iters} iterations")
-    return run_agent_path(env.copy(), agent, "Value Iteration Demo")
+def command_demo(args) -> None:
+    config = common.load_config(args.config)
+    paths.ensure_dirs()
+    common.ensure_map(config, verbose=False)
+    reward_mode = args.reward_mode
+
+    for algorithm in ALGORITHMS:
+        common.banner(f"{algorithm} ({reward_mode} rewards)")
+        env = common.build_env(config, reward_mode=reward_mode, seed=0)
+
+        if algorithm == "value_iteration":
+            agent = common.make_planner(env, config)
+            model = common.model_path(algorithm, f"{algorithm}_{reward_mode}.npz")
+            if model.exists():
+                agent.load(model)
+            else:
+                agent.train()
+        else:
+            seeds = config["training"]["seeds"]
+            agent = common.make_learner(algorithm, env, config, seed=seeds[0])
+            model = next(
+                (
+                    path
+                    for path in (
+                        common.model_path(algorithm, f"{algorithm}_{reward_mode}_seed{s}.npz")
+                        for s in seeds
+                    )
+                    if path.exists()
+                ),
+                None,
+            )
+            if model is not None:
+                agent.load(model)
+            else:
+                print(f"  no saved model; training {config[algorithm]['episodes']} episodes")
+                agent.train(episodes=config[algorithm]["episodes"], eval_every=0)
+
+        trace = rollout(env, agent, seed=config["training"]["eval_seed"])
+        metrics = evaluate_policy(env, agent, episodes=200, seed=config["training"]["eval_seed"])
+        print(f"  one greedy episode: {trace['steps']} steps, "
+              f"return {trace['total_reward']:+.2f}, outcome {trace['outcome']}")
+        print(f"  over 200 episodes : success {metrics['success_rate']:.3f}, "
+              f"return {metrics['mean_return']:+.2f}, "
+              f"steps {metrics['mean_steps']:.1f}, "
+              f"energy left {metrics['mean_energy_left']:.1f}")
+        env.render()
 
 
-def demo_q_learning(env):
-    agent = QLearningAgent(env.copy(), alpha=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.995)
-    results = agent.train(episodes=1000)
-    agent.epsilon = 0
+def command_train(args) -> None:
+    config = common.load_config(args.config)
+    paths.ensure_dirs()
+    common.ensure_map(config, verbose=False)
 
-    avg_reward = np.mean(results["rewards"][-100:])
-    print(f"Training complete. Avg reward (last 100): {avg_reward:.2f}")
-    return run_agent_path(env.copy(), agent, "Q-Learning Demo")
+    if args.algorithm == "value_iteration":
+        from experiments import run_value_iteration
+
+        run_value_iteration.run(config, [args.reward_mode])
+        return
+
+    record = common.train_learner(
+        args.algorithm,
+        config,
+        reward_mode=args.reward_mode,
+        seed=args.seed,
+        episodes=args.episodes,
+    )
+    print(f"  model saved to {record['model_file']}")
 
 
-def demo_sarsa_lambda(env):
-    agent = SarsaLambdaAgent(env.copy(), alpha=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.995, lam=0.9)
-    results = agent.train(episodes=1000)
-    agent.epsilon = 0
+def command_experiments(args) -> None:
+    from experiments import run_experiments
 
-    avg_reward = np.mean(results["rewards"][-100:])
-    print(f"Training complete. Avg reward (last 100): {avg_reward:.2f}")
-    return run_agent_path(env.copy(), agent, "SARSA(lambda) Demo")
+    forwarded = []
+    if args.config:
+        forwarded += ["--config", args.config]
+    if args.quick:
+        forwarded.append("--quick")
+    run_experiments.main(forwarded)
 
 
-def main():
-    print("=" * 50)
-    print("  Reinforcement Learning Maze Solver")
-    print("=" * 50)
+def command_analyze(args) -> None:
+    from experiments import analysis
 
-    gen = MazeGenerator(student_id=STUDENT_ID)
-    gen.print_info()
-    print()
+    analysis.main(["--config", args.config] if args.config else [])
 
-    env = gen.generate()
-    print("Maze (shared by all algorithm runs):")
-    print_maze(env)
-    print()
 
-    print("Options:")
-    print("1. Value Iteration (model-based)")
-    print("2. Q-Learning (model-free)")
-    print("3. SARSA(lambda) (model-free)")
-    print("4. Run all demos")
-    print("5. Generate and save maze only")
+def command_gui(args) -> None:
+    from gui import app
 
-    choice = input("\nSelect option (1-5): ").strip()
+    forwarded = ["--algorithm", args.algorithm, "--reward-mode", args.reward_mode]
+    if args.config:
+        forwarded += ["--config", args.config]
+    if args.record:
+        forwarded.append("--record")
+    app.main(forwarded)
 
-    if choice == "1":
-        demo_value_iteration(env)
-    elif choice == "2":
-        demo_q_learning(env)
-    elif choice == "3":
-        demo_sarsa_lambda(env)
-    elif choice == "4":
-        vi_steps, vi_ok = demo_value_iteration(env)
-        ql_steps, ql_ok = demo_q_learning(env)
-        sa_steps, sa_ok = demo_sarsa_lambda(env)
-        print("\n=== Comparison Summary (same map) ===")
-        print(f"Value Iteration: {vi_steps} steps, success={vi_ok}")
-        print(f"Q-Learning:      {ql_steps} steps, success={ql_ok}")
-        print(f"SARSA(lambda):   {sa_steps} steps, success={sa_ok}")
-    elif choice == "5":
-        print("Generated maze:")
-        print_maze(env)
-        map_path = os.path.join("results", "raw_data", "maze_map.json")
-        os.makedirs(os.path.dirname(map_path), exist_ok=True)
-        env.save_map(map_path)
-        print(f"Map saved to {map_path}")
-    else:
-        print("Invalid option.")
+
+def command_test(args) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"],
+        cwd=paths.ROOT,
+    )
+    sys.exit(result.returncode)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="RL maze solver -- student 40305054",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument("--config", default=None, help="path to a config JSON file")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("info", help="print the config, maze stats and budgets")
+    subparsers.add_parser("generate", help="regenerate and save the shared maze")
+
+    demo = subparsers.add_parser("demo", help="run one greedy episode per algorithm")
+    demo.add_argument("--reward-mode", default="shaped", choices=("sparse", "shaped"))
+
+    train = subparsers.add_parser("train", help="train a single agent")
+    train.add_argument("--algorithm", default="q_learning", choices=ALGORITHMS)
+    train.add_argument("--reward-mode", default="shaped", choices=("sparse", "shaped"))
+    train.add_argument("--seed", type=int, default=1)
+    train.add_argument("--episodes", type=int, default=None)
+
+    experiments = subparsers.add_parser("experiments", help="run the full suite")
+    experiments.add_argument("--quick", action="store_true")
+
+    subparsers.add_parser("analyze", help="rebuild figures and tables")
+
+    gui = subparsers.add_parser("gui", help="launch the interactive viewer")
+    gui.add_argument("--algorithm", default="value_iteration", choices=ALGORITHMS)
+    gui.add_argument("--reward-mode", default="shaped", choices=("sparse", "shaped"))
+    gui.add_argument("--record", action="store_true")
+
+    subparsers.add_parser("test", help="run the unit tests")
+    return parser
+
+
+COMMANDS = {
+    "info": command_info,
+    "generate": command_generate,
+    "demo": command_demo,
+    "train": command_train,
+    "experiments": command_experiments,
+    "analyze": command_analyze,
+    "gui": command_gui,
+    "test": command_test,
+}
+
+
+def main(argv=None) -> None:
+    args = build_parser().parse_args(argv)
+    COMMANDS[args.command](args)
 
 
 if __name__ == "__main__":

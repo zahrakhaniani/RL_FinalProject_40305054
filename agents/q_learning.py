@@ -1,84 +1,147 @@
+"""Model-free Q-Learning (off-policy temporal-difference control).
+
+The learner never touches ``env.transitions()``; it only samples from
+``env.step()``, so the 0.8 / 0.1 / 0.1 slip model is respected implicitly through
+experience. Episodes cut short by ``max_steps`` are bootstrapped normally instead
+of being treated as terminal, because truncation is an experiment-level limit
+rather than a real absorbing state of the MDP.
+
+A thinned sample of the individual Q-updates is kept so the report can show
+concrete ``(state, action, reward, next_state, Q_old, Q_new)`` rows rather than
+only aggregate curves.
+"""
+
+from __future__ import annotations
+
+import time
+from typing import List, Optional, Tuple
+
 import numpy as np
-import random
-from collections import defaultdict
-from environments.maze import MazeEnv, Action
+
+from agents.base import TabularAgent, TrainingLog, evaluate_policy, log_episode
+from environments.maze import State
 
 
-class QLearningAgent:
+class QLearningAgent(TabularAgent):
+    name = "q_learning"
+
     def __init__(
         self,
-        env,
-        alpha=0.15,
-        gamma=0.99,
-        epsilon=1.0,
-        epsilon_min=0.05,
-        epsilon_decay=0.998,
-        optimistic_init=1.0,
-    ):
-        self.env = env
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
-        self.epsilon_min = epsilon_min
-        self.epsilon_decay = epsilon_decay
-        self.optimistic_init = optimistic_init
-        self.Q = defaultdict(lambda: np.full(len(Action), optimistic_init))
+        *args,
+        q_log_every: int = 500,
+        q_log_max: int = 500,
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.q_log_every = int(q_log_every)
+        self.q_log_max = int(q_log_max)
+        self.q_update_samples: List[dict] = []
+        self._updates = 0
 
-    def get_action(self, state, greedy=False):
-        valid_actions = self.env.get_valid_actions(state)
-        if not valid_actions:
-            return Action.UP
+    def train(
+        self,
+        episodes: int = 3000,
+        eval_every: int = 100,
+        eval_episodes: int = 30,
+        eval_seed: int = 555_000,
+        episode_seed_base: Optional[int] = None,
+        verbose: bool = False,
+    ) -> TrainingLog:
+        log = TrainingLog()
+        base = self.seed * 1_000_003 if episode_seed_base is None else episode_seed_base
+        started = time.perf_counter()
 
-        if not greedy and random.random() < self.epsilon:
-            return random.choice(valid_actions)
+        for episode in range(1, episodes + 1):
+            result = self.run_episode(episode, episodes, base + episode)
+            log_episode(
+                log, self.env, episode, self.epsilon, self.alpha, result["td_errors"]
+            )
 
-        q_values = self.Q[state]
-        max_q = max(q_values[a] for a in valid_actions)
-        best_actions = [a for a in valid_actions if q_values[a] == max_q]
-        return Action(random.choice(best_actions))
+            if eval_every and episode % eval_every == 0:
+                metrics = evaluate_policy(self.env, self, eval_episodes, eval_seed)
+                log.add_eval(episode, metrics)
+                if verbose:
+                    print(
+                        f"    episode {episode:5d} | eps {self.epsilon:.3f} | "
+                        f"greedy success {metrics['success_rate']:.2f} | "
+                        f"greedy return {metrics['mean_return']:8.2f}"
+                    )
 
-    def _max_valid_q(self, state):
-        valid_actions = self.env.get_valid_actions(state)
-        if not valid_actions:
-            return 0.0
-        q_values = self.Q[state]
-        return max(q_values[a] for a in valid_actions)
+        self.train_seconds = time.perf_counter() - started
+        return log
 
-    def update(self, state, action, reward, next_state, done):
-        current_q = self.Q[state][action]
-        if done:
-            target = reward
-        else:
-            target = reward + self.gamma * self._max_valid_q(next_state)
-        self.Q[state][action] += self.alpha * (target - current_q)
+    def run_episode(
+        self,
+        episode: int,
+        total_episodes: int,
+        seed: int,
+        record: bool = False,
+    ) -> dict:
+        """One episode of learning. ``record`` also returns the path walked.
 
-    def decay_epsilon(self):
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        Split out from ``train`` so the GUI can drive training one episode at a
+        time and animate what the agent actually did, using the same code path as
+        the batch experiments.
+        """
+        state = self.env.reset(seed=seed)
+        self.record_visit(state)
+        td_errors: List[float] = []
+        path: List[Tuple[State, Optional[dict]]] = [(state, None)] if record else []
+        done = False
 
-    def train(self, episodes=3000, max_steps=500):
-        results = {"episodes": [], "rewards": [], "steps": [], "epsilon": []}
+        while not done:
+            action = self.get_action(state, greedy=False)
+            next_state, reward, done, info = self.env.step(action)
+            td_errors.append(self._update(state, action, reward, next_state, info, episode))
+            if record:
+                path.append((next_state, info))
+            state = next_state
+            self.record_visit(state)
 
-        for episode in range(episodes):
-            state = self.env.reset()
-            total_reward = 0
-            step = 0
+        self.update_epsilon(episode, total_episodes)
+        self.training_episodes += 1
+        return {"td_errors": td_errors, "path": path, "outcome": self.env.outcome}
 
-            for step in range(max_steps):
-                action = self.get_action(state)
-                next_state, reward, done, _ = self.env.step(action)
-                self.update(state, action, reward, next_state, done)
-                state = next_state
-                total_reward += reward
-                if done:
-                    break
+    def _update(
+        self,
+        state: State,
+        action: int,
+        reward: float,
+        next_state: State,
+        info: dict,
+        episode: int,
+    ) -> float:
+        index = self.feature(state) + (action,)
+        terminal = info["success"] or info["energy_exhausted"]
+        target = reward
+        if not terminal:
+            target += self.gamma * float(self.q[self.feature(next_state)].max())
 
-            self.decay_epsilon()
-            results["episodes"].append(episode)
-            results["rewards"].append(total_reward)
-            results["steps"].append(step + 1)
-            results["epsilon"].append(self.epsilon)
+        old_value = float(self.q[index])
+        td_error = target - old_value
+        new_value = old_value + self.alpha * td_error
+        self.q[index] = new_value
 
-        return results
-
-    def get_q_table(self):
-        return dict(self.Q)
+        self._updates += 1
+        if (
+            len(self.q_update_samples) < self.q_log_max
+            and self._updates % self.q_log_every == 0
+        ):
+            self.q_update_samples.append(
+                {
+                    "episode": episode,
+                    "update": self._updates,
+                    "state": str(tuple(int(x) for x in state)),
+                    "action": int(action),
+                    "reward": round(float(reward), 6),
+                    "next_state": str(tuple(int(x) for x in next_state)),
+                    "done": int(bool(terminal)),
+                    "q_old": round(old_value, 6),
+                    "q_new": round(new_value, 6),
+                    "td_error": round(td_error, 6),
+                    "alpha": self.alpha,
+                    "gamma": self.gamma,
+                    "epsilon": round(self.epsilon, 6),
+                }
+            )
+        return td_error
