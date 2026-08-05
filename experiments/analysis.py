@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 import paths
-from environments.maze import Cell
+from environments.maze import Cell, bfs_distances
 from experiments import common
 
 MODE_COLORS = {"sparse": "#d1495b", "shaped": "#00798c"}
@@ -108,9 +108,10 @@ def band(axis, x, stack: np.ndarray, color: str, label: str) -> None:
         )
 
 
-def save(figure, path: Path) -> None:
+def save(figure, path: Path, *, tight: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    figure.tight_layout()
+    if tight:
+        figure.tight_layout()
     figure.savefig(path, dpi=130)
     plt.close(figure)
     print(f"  wrote {paths.rel(path)}")
@@ -135,25 +136,189 @@ def wall_overlay(axis, env) -> None:
     axis.imshow(walls, cmap=matplotlib.colors.ListedColormap(["#2f3640"]), vmin=0, vmax=1)
 
 
-def heatmap(figure, axis, env, grid: np.ndarray, title: str, cmap: str = "viridis") -> None:
+def heatmap(
+    figure,
+    axis,
+    env,
+    grid: np.ndarray,
+    title: str,
+    cmap: str = "viridis",
+    *,
+    vmin=None,
+    vmax=None,
+    colorbar: bool = True,
+):
     masked = np.ma.masked_where(env.grid == Cell.WALL, grid)
-    image = axis.imshow(masked, cmap=cmap, interpolation="nearest")
+    image = axis.imshow(
+        masked, cmap=cmap, interpolation="nearest", vmin=vmin, vmax=vmax
+    )
     wall_overlay(axis, env)
-    figure.colorbar(image, ax=axis, fraction=0.046)
+    if colorbar:
+        figure.colorbar(image, ax=axis, fraction=0.046)
     axis.set_title(title, fontsize=10)
     bare_axes(axis)
     mark_landmarks(axis, env)
+    return image
 
 
-def policy_panel(axis, env, policy: np.ndarray, title: str, colour: str = "#00798c") -> None:
-    axis.imshow(env.grid == Cell.WALL, cmap="Greys", interpolation="nearest")
+def policy_state_mask(env, has_key: int) -> np.ndarray:
+    """States where a policy action is meaningful for the selected key status."""
+    source = env.key if has_key else env.start
+    reachable = bfs_distances(
+        env.grid, [source], door_passable=bool(has_key)
+    ) >= 0
+    # Reaching the goal with the key terminates the episode, so it has no action.
+    if has_key:
+        reachable[env.goal] = False
+    return reachable
+
+
+def maze_canvas(env) -> np.ndarray:
+    canvas = np.zeros((env.rows, env.cols, 3))
+    for row in range(env.rows):
+        for col in range(env.cols):
+            canvas[row, col] = matplotlib.colors.to_rgb(
+                CELL_COLORS[Cell(env.grid[row, col])]
+            )
+    return canvas
+
+
+def policy_panel(
+    axis,
+    env,
+    policy: np.ndarray,
+    title: str,
+    colour: str = "#00798c",
+    valid_mask: Optional[np.ndarray] = None,
+) -> None:
+    axis.imshow(maze_canvas(env), interpolation="nearest")
+    valid_mask = (
+        np.asarray(valid_mask, dtype=bool)
+        if valid_mask is not None
+        else env.grid != Cell.WALL
+    )
     for row, col in env.passable_cells:
+        if not valid_mask[row, col]:
+            continue
         dx, dy = ARROWS[int(policy[row, col])]
-        axis.arrow(col, row, dx, dy, head_width=0.18, head_length=0.18,
-                   color=colour, linewidth=0.6)
+        axis.arrow(
+            col - dx / 2,
+            row - dy / 2,
+            dx,
+            dy,
+            head_width=0.18,
+            head_length=0.14,
+            color=colour,
+            linewidth=0.6,
+            length_includes_head=True,
+        )
     axis.set_title(title, fontsize=10)
     bare_axes(axis)
-    mark_landmarks(axis, env, colour="#d1495b")
+    mark_landmarks(axis, env, colour="#17202a")
+
+
+def energy_bin_ranges(max_energy: int, bins: int = 8):
+    """Return exact inclusive ranges and representative energies for each bin."""
+    width = max_energy + 1
+    ranges = []
+    for index in range(bins):
+        low = (index * width + bins - 1) // bins
+        high = ((index + 1) * width + bins - 1) // bins - 1
+        representative = max(1, (low + high) // 2)
+        ranges.append((index, low, high, representative))
+    return ranges
+
+
+def plot_energy_bin_maps(
+    agent,
+    env,
+    algorithm: str,
+    subtitle: str,
+    bins: int = 8,
+) -> None:
+    """Save value and policy maps for both key states in every energy bin."""
+    display_name = {
+        "value_iteration": "Value Iteration",
+        "q_learning": "Q-Learning",
+        "sarsa_lambda": "SARSA(lambda)",
+    }.get(algorithm, algorithm.replace("_", " ").title())
+    ranges = energy_bin_ranges(env.max_energy, bins)
+    positions = [
+        (bin_index // 2, (bin_index % 2) * 2 + has_key)
+        for bin_index, _, _, _ in ranges
+        for has_key in (0, 1)
+    ]
+
+    value_grids = [
+        agent.value_grid(has_key, energy)
+        for _, _, _, energy in ranges
+        for has_key in (0, 1)
+    ]
+    finite = np.concatenate(
+        [grid[np.isfinite(grid) & (env.grid != Cell.WALL)] for grid in value_grids]
+    )
+    vmin, vmax = float(finite.min()), float(finite.max())
+
+    figure, axes = plt.subplots(4, 4, figsize=(18, 18))
+    image = None
+    for (axis_row, axis_col), grid, details in zip(
+        positions,
+        value_grids,
+        [
+            (bin_index, low, high, energy, has_key)
+            for bin_index, low, high, energy in ranges
+            for has_key in (0, 1)
+        ],
+    ):
+        bin_index, low, high, energy, has_key = details
+        image = heatmap(
+            figure,
+            axes[axis_row, axis_col],
+            env,
+            grid,
+            f"bin {bin_index}: E={low}-{high}, shown E={energy}\n"
+            f"has_key={has_key}",
+            vmin=vmin,
+            vmax=vmax,
+            colorbar=False,
+        )
+    figure.subplots_adjust(
+        left=0.025, right=0.91, bottom=0.025, top=0.91, wspace=0.12, hspace=0.28
+    )
+    color_axis = figure.add_axes((0.93, 0.16, 0.015, 0.66))
+    figure.colorbar(image, cax=color_axis, label="state value")
+    figure.suptitle(
+        f"{display_name}: value heat maps for all {bins} energy bins\n{subtitle}",
+        fontsize=14,
+        y=0.975,
+    )
+    save(figure, common.figure_path(algorithm, "value_heatmap.png"), tight=False)
+
+    figure, axes = plt.subplots(4, 4, figsize=(18, 18))
+    masks = {has_key: policy_state_mask(env, has_key) for has_key in (0, 1)}
+    for bin_index, low, high, energy in ranges:
+        axis_row = bin_index // 2
+        for has_key in (0, 1):
+            axis_col = (bin_index % 2) * 2 + has_key
+            policy_panel(
+                axes[axis_row, axis_col],
+                env,
+                agent.greedy_policy_grid(has_key, energy),
+                f"bin {bin_index}: E={low}-{high}, shown E={energy}\n"
+                f"has_key={has_key}",
+                colour=ALGO_COLORS.get(algorithm, "#00798c"),
+                valid_mask=masks[has_key],
+            )
+    figure.suptitle(
+        f"{display_name}: policy maps for all {bins} energy bins\n"
+        f"{subtitle}; arrows omitted for terminal and unreachable states",
+        fontsize=14,
+        y=0.975,
+    )
+    figure.subplots_adjust(
+        left=0.025, right=0.985, bottom=0.025, top=0.91, wspace=0.12, hspace=0.28
+    )
+    save(figure, common.figure_path(algorithm, "policy_map.png"), tight=False)
 
 
 # ---------------------------------------------------------------- maze figures
@@ -226,19 +391,13 @@ def plot_value_iteration(config: dict, records: Sequence[dict]) -> None:
     if agent is None:
         return
 
-    figure, axes = plt.subplots(1, 2, figsize=(11, 4.8))
-    for axis, has_key in zip(axes, (0, 1)):
-        heatmap(figure, axis, env, agent.value_grid(has_key, env.max_energy),
-                f"V*(s), has_key={has_key}, full battery")
-    figure.suptitle("Value Iteration: optimal value heat map")
-    save(figure, common.figure_path("value_iteration", "value_heatmap.png"))
-
-    figure, axes = plt.subplots(1, 2, figsize=(11, 5.4))
-    for axis, has_key in zip(axes, (0, 1)):
-        policy_panel(axis, env, agent.greedy_policy_grid(has_key, env.max_energy),
-                     f"optimal policy, has_key={has_key}")
-    figure.suptitle("Value Iteration: final policy map")
-    save(figure, common.figure_path("value_iteration", "policy_map.png"))
+    plot_energy_bin_maps(
+        agent,
+        env,
+        "value_iteration",
+        "optimal V*(s) and policy at each bin midpoint",
+        bins=int(config["q_learning"].get("energy_bins", 8)),
+    )
 
 
 def plot_gamma_sweep(payload: Optional[dict]) -> None:
@@ -331,20 +490,13 @@ def plot_learner_maps(
         print(f"  (skipping {algorithm} maps: no saved model for seed {seed})")
         return
 
-    figure, axes = plt.subplots(1, 2, figsize=(11, 4.8))
-    for axis, has_key in zip(axes, (0, 1)):
-        heatmap(figure, axis, env, agent.value_grid(has_key, env.max_energy),
-                f"max_a Q(s,a), has_key={has_key}, full battery")
-    figure.suptitle(f"{algorithm}: learned value heat map ({reward_mode} rewards, seed {seed})")
-    save(figure, common.figure_path(algorithm, "value_heatmap.png"))
-
-    figure, axes = plt.subplots(1, 2, figsize=(11, 5.4))
-    for axis, has_key in zip(axes, (0, 1)):
-        policy_panel(axis, env, agent.greedy_policy_grid(has_key, env.max_energy),
-                     f"greedy policy, has_key={has_key}",
-                     colour=ALGO_COLORS.get(algorithm, "#00798c"))
-    figure.suptitle(f"{algorithm}: final policy map ({reward_mode} rewards, seed {seed})")
-    save(figure, common.figure_path(algorithm, "policy_map.png"))
+    plot_energy_bin_maps(
+        agent,
+        env,
+        algorithm,
+        f"{reward_mode} rewards, seed {seed}",
+        bins=agent.energy_bins,
+    )
 
     # Visit counts summed over seeds: where the exploration actually went.
     visits = np.sum(

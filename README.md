@@ -64,7 +64,7 @@ after the three algorithm stages. Every run is seeded, so repeating any command
 reproduces the same numbers. The maze is generated once and saved; all algorithms
 then load that same file.
 
-## Interactive viewer
+## Interactive viewer / GUI
 
 ```bash
 python main.py gui                                  # or: python gui/app.py
@@ -130,6 +130,7 @@ Recorded frames land in `results/videos/<algorithm>/run_<timestamp>/`. To turn
 them into a video with an external tool:
 
 ```bash
+winget install ffmpeg
 ffmpeg -framerate 30 -i frame_%05d.png -pix_fmt yuv420p run.mp4
 ```
 
@@ -262,7 +263,7 @@ Averaged over 5 seeds, 300 greedy evaluation episodes each. Full tables are in
 | SARSA(lambda)   | shaped  | **1.000** | 98.3   | 177.4 | 47.6        |
 
 
-Three things stand out, and `report.md` discusses them in detail:
+Three things stand out, and `report.pdf` discusses them in detail:
 
 1. Value Iteration is optimal and effectively instant (0.02 s) because it owns
   the model and because energy makes the MDP acyclic — one backward pass over
@@ -303,7 +304,7 @@ learning speed and final quality. Transfer pays off on the hard target and
 backfires on the easy one: full transfer onto `similar` reaches the threshold 480
 episodes sooner but ends at 0.800 ± 0.447, because one seed in five locks into the
 stale route and finishes at 0.000. Scaling the prior by β = 0.25 keeps the
-speed-up with zero failures. `report.md` section 6 works through the numbers, the
+speed-up with zero failures. `report.pdf` section 6 works through the numbers, the
 mechanism and the negative-transfer case; the omitted β = 0.5 and β = 0.75 rows
 are in the CSV.
 
@@ -316,13 +317,13 @@ results/figures/
 ├── maze_target_different.png             # transfer target B
 ├── value_iteration/
 │   ├── convergence.png                   # value change per energy level
-│   ├── value_heatmap.png                 # V* before and after the key
-│   ├── policy_map.png                    # the optimal policy
+│   ├── value_heatmap.png                 # V* for all 8 energy bins x key status
+│   ├── policy_map.png                    # optimal policies for all 8 bins
 │   └── gamma_sweep.png                   # gamma in {0.90, 0.95, 0.99}
 ├── q_learning/
 │   ├── learning_curves.png
-│   ├── value_heatmap.png                 # max_a Q(s,a)
-│   ├── policy_map.png                    # the learned greedy policy
+│   ├── value_heatmap.png                 # max_a Q(s,a), all 8 energy bins
+│   ├── policy_map.png                    # greedy policies for all 8 bins
 │   ├── visit_counts.png                  # where exploration actually went
 │   └── epsilon_schedules.png             # linear vs exponential decay
 ├── sarsa_lambda/
@@ -341,6 +342,12 @@ results/figures/
     ├── policy_difference.png             # model-free greedy action vs VI
     └── learning_vs_optimal.png
 ```
+
+Each value and policy figure contains 16 panels: eight energy bins, each shown
+with `has_key=0` and `has_key=1`. Q-Learning and SARSA use one table slice per
+bin. Value Iteration stores every energy level exactly, so its panel uses the
+midpoint energy printed in the title. Policy arrows are omitted on the terminal
+goal and on states unreachable with the selected key status.
 
 ### Logs
 
@@ -399,7 +406,7 @@ RL_FinalProject_40305054/
 │                               # logging, variants and transfer scenarios
 ├── paths.py                    # repo-relative path helpers
 ├── main.py                     # single entry point
-├── report.md
+├── report.pdf
 ├── requirements.txt
 └── README.md
 ```
