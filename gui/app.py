@@ -255,7 +255,7 @@ class MazeApp:
             self.notice = f"training finished after {self.agent.training_episodes} episodes"
             return
         self.reset_episode()
-        if self.mode == "train":
+        if self.mode == "train" and self.algorithm != "value_iteration":
             self._start_training_episode()
 
     @property
@@ -331,6 +331,9 @@ class MazeApp:
 
     def _train_without_animation(self, budget: int = 40) -> None:
         """Crunch episodes between frames, for when watching each step is too slow."""
+        if self.algorithm == "value_iteration":
+            return
+
         for _ in range(budget):
             if self.training_finished:
                 self.playing = False
@@ -550,7 +553,7 @@ class MazeApp:
             self.step_once()
         elif key == pygame.K_r:
             self.reset_episode()
-            if self.mode == "train":
+            if self.mode == "train" and self.algorithm != "value_iteration":
                 self._start_training_episode()
         elif key == pygame.K_v:
             self.show_values = not self.show_values
