@@ -15,6 +15,52 @@ scratch on top of NumPy only — no RL libraries:
 A fourth study reuses the learned Q-table on two perturbed mazes under four
 transfer schemes, and measures where transfer helps, does nothing, and hurts.
 
+
+
+## Project layout
+
+```
+RL_FinalProject_40305054/
+├── environments/
+│   ├── maze.py                 # the MDP: state, dynamics, both reward modes
+│   ├── generator.py            # seeded generation, vault sealing, BFS validation
+│   ├── variants.py             # the two perturbed transfer targets
+│   └── maps/                   # the saved mazes every algorithm loads
+├── agents/
+│   ├── base.py                 # tabular scaffolding, energy binning, logging, agreement
+│   ├── value_iteration.py      # exact backward induction + residual check
+│   ├── q_learning.py           # off-policy TD control
+│   └── sarsa_lambda.py         # on-policy TD with sparse eligibility traces
+├── transfer/transfer_learning.py   # scratch / full / scaled / selective
+├── gui/
+│   ├── renderer.py             # vector drawing, no image assets needed
+│   └── app.py                  # interactive viewer, live training, figure gallery
+├── experiments/
+│   ├── common.py               # config, maze, agent factory, result writing
+│   ├── run_value_iteration.py  # one runner per algorithm
+│   ├── run_q_learning.py
+│   ├── run_sarsa_lambda.py
+│   ├── run_comparison.py       # cross-algorithm table + policy agreement
+│   ├── run_transfer.py
+│   ├── run_experiments.py      # runs them all, then the analysis
+│   ├── analysis.py             # figures and comparison tables
+│   └── configs/default.json    # every hyperparameter lives here
+├── results/
+│   ├── raw_data/<algorithm>/   # per-episode CSVs, JSON logs, summary tables
+│   ├── models/<algorithm>/     # saved value functions and Q-tables (.npz)
+│   ├── figures/<algorithm>/
+│   └── videos/<algorithm>/
+├── tests/                      # unit tests for the env, generator, agents,
+│                               # logging, variants and transfer scenarios
+├── paths.py                    # repo-relative path helpers
+├── main.py                     # single entry point
+├── report.pdf
+├── requirements.txt
+└── README.md
+```
+
+
+
 ## Setup
 
 **Windows**
@@ -366,51 +412,6 @@ trace columns are zero for Q-Learning, which has no traces.
 `results/raw_data/q_learning/q_updates_<run>.csv` holds a thinned sample of
 individual Q-updates with `state`, `action`, `reward`, `next_state`, `done`,
 `q_old`, `q_new` and `td_error`, so the update rule can be checked by hand.
-
-
-
-## Project layout
-
-```
-RL_FinalProject_40305054/
-├── environments/
-│   ├── maze.py                 # the MDP: state, dynamics, both reward modes
-│   ├── generator.py            # seeded generation, vault sealing, BFS validation
-│   ├── variants.py             # the two perturbed transfer targets
-│   └── maps/                   # the saved mazes every algorithm loads
-├── agents/
-│   ├── base.py                 # tabular scaffolding, energy binning, logging, agreement
-│   ├── value_iteration.py      # exact backward induction + residual check
-│   ├── q_learning.py           # off-policy TD control
-│   └── sarsa_lambda.py         # on-policy TD with sparse eligibility traces
-├── transfer/transfer_learning.py   # scratch / full / scaled / selective
-├── gui/
-│   ├── renderer.py             # vector drawing, no image assets needed
-│   └── app.py                  # interactive viewer, live training, figure gallery
-├── experiments/
-│   ├── common.py               # config, maze, agent factory, result writing
-│   ├── run_value_iteration.py  # one runner per algorithm
-│   ├── run_q_learning.py
-│   ├── run_sarsa_lambda.py
-│   ├── run_comparison.py       # cross-algorithm table + policy agreement
-│   ├── run_transfer.py
-│   ├── run_experiments.py      # runs them all, then the analysis
-│   ├── analysis.py             # figures and comparison tables
-│   └── configs/default.json    # every hyperparameter lives here
-├── results/
-│   ├── raw_data/<algorithm>/   # per-episode CSVs, JSON logs, summary tables
-│   ├── models/<algorithm>/     # saved value functions and Q-tables (.npz)
-│   ├── figures/<algorithm>/
-│   └── videos/<algorithm>/
-├── tests/                      # unit tests for the env, generator, agents,
-│                               # logging, variants and transfer scenarios
-├── paths.py                    # repo-relative path helpers
-├── main.py                     # single entry point
-├── report.pdf
-├── requirements.txt
-└── README.md
-```
-
 
 
 ## Design notes
