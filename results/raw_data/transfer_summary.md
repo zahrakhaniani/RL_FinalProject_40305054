@@ -1,0 +1,14 @@
+| variant | scenario | zero_shot_success | early_success | final_success | final_success_std | episodes_to_threshold | final_delta | speed_delta | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| different | full | 0.000 | 0.007 | 0.795 | 0.445 | 1000.000 | 0.026 | 1000.000 | positive |
+| different | scaled_0.25 | 0.000 | 0.056 | 0.979 | 0.034 | 1220.000 | 0.210 | 780.000 | positive |
+| different | scaled_0.5 | 0.000 | 0.027 | 0.805 | 0.225 | 1260.000 | 0.036 | 740.000 | positive |
+| different | scaled_0.75 | 0.000 | 0.042 | 0.951 | 0.051 | 1340.000 | 0.182 | 660.000 | positive |
+| different | scratch | 0.000 | 0.000 | 0.769 | 0.287 | 2000.000 | 0.000 | 0.000 | neutral |
+| different | selective | 0.000 | 0.009 | 0.755 | 0.424 | 1140.000 | -0.015 | 860.000 | positive |
+| similar | full | 0.000 | 0.000 | 0.800 | 0.447 | 960.000 | -0.199 | 480.000 | negative |
+| similar | scaled_0.25 | 0.000 | 0.000 | 1.000 | 0.000 | 1040.000 | 0.001 | 400.000 | positive |
+| similar | scaled_0.5 | 0.000 | 0.000 | 0.998 | 0.003 | 980.000 | -0.001 | 460.000 | positive |
+| similar | scaled_0.75 | 0.000 | 0.000 | 0.758 | 0.346 | 1100.000 | -0.241 | 340.000 | negative |
+| similar | scratch | 0.000 | 0.000 | 0.999 | 0.003 | 1440.000 | 0.000 | 0.000 | neutral |
+| similar | selective | 0.000 | 0.000 | 0.971 | 0.062 | 1880.000 | -0.028 | -440.000 | negative |

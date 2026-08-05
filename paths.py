@@ -21,10 +21,13 @@ VIDEOS = RESULTS / "videos"
 
 DEFAULT_CONFIG = CONFIGS / "default.json"
 
-ALGORITHMS = ("value_iteration", "q_learning", "sarsa_lambda", "transfer")
+ALGORITHMS = ("value_iteration", "q_learning", "sarsa_lambda", "transfer", "comparison")
 
 
-def map_file(student_id: str) -> Path:
+def map_file(student_id: str, variant: str = None) -> Path:
+    """Map file for the source maze, or for a transfer target variant."""
+    if variant:
+        return MAPS / f"maze_{student_id}_{variant}.json"
     return MAPS / f"maze_{student_id}.json"
 
 

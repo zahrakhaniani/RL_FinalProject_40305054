@@ -8,6 +8,8 @@
     python main.py experiments --quick      # small smoke run
     python main.py analyze                  # rebuild figures from saved results
     python main.py gui                      # interactive pygame viewer
+    python main.py gui --mode train --algorithm q_learning
+    python main.py gui --environment similar
     python main.py test                     # unit tests
 """
 
@@ -151,6 +153,8 @@ def command_experiments(args) -> None:
         forwarded += ["--config", args.config]
     if args.quick:
         forwarded.append("--quick")
+    if args.skip_sweeps:
+        forwarded.append("--skip-sweeps")
     run_experiments.main(forwarded)
 
 
@@ -163,7 +167,12 @@ def command_analyze(args) -> None:
 def command_gui(args) -> None:
     from gui import app
 
-    forwarded = ["--algorithm", args.algorithm, "--reward-mode", args.reward_mode]
+    forwarded = [
+        "--algorithm", args.algorithm,
+        "--reward-mode", args.reward_mode,
+        "--environment", args.environment,
+        "--mode", args.mode,
+    ]
     if args.config:
         forwarded += ["--config", args.config]
     if args.record:
@@ -202,12 +211,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     experiments = subparsers.add_parser("experiments", help="run the full suite")
     experiments.add_argument("--quick", action="store_true")
+    experiments.add_argument("--skip-sweeps", action="store_true")
 
     subparsers.add_parser("analyze", help="rebuild figures and tables")
 
     gui = subparsers.add_parser("gui", help="launch the interactive viewer")
     gui.add_argument("--algorithm", default="value_iteration", choices=ALGORITHMS)
     gui.add_argument("--reward-mode", default="shaped", choices=("sparse", "shaped"))
+    gui.add_argument(
+        "--environment", default="source", choices=("source", "similar", "different")
+    )
+    gui.add_argument("--mode", default="eval", choices=("eval", "train"))
     gui.add_argument("--record", action="store_true")
 
     subparsers.add_parser("test", help="run the unit tests")

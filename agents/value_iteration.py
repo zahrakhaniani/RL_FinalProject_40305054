@@ -35,6 +35,7 @@ class ValueIterationAgent(BaseAgent):
         gamma: float = 0.99,
         theta: float = 1e-10,
         seed: int = 0,
+        build_model: bool = True,
     ) -> None:
         self.env = env
         self.gamma = float(gamma)
@@ -53,7 +54,15 @@ class ValueIterationAgent(BaseAgent):
         self.values = np.zeros((self.n_cells, 2, self.max_energy + 1))
         self.policy = np.zeros((self.n_cells, 2, self.max_energy + 1), dtype=np.int8)
         self.trained = False
-        self._model = self._build_model()
+        # Loading a saved value table does not need the model, and building it is
+        # the expensive part of construction.
+        self._model = self._build_model() if build_model else None
+
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = self._build_model()
+        return self._model
 
     # ------------------------------------------------------------------- model
 
@@ -117,7 +126,7 @@ class ValueIterationAgent(BaseAgent):
                 q = np.empty((self.n_cells, N_ACTIONS))
                 for action in range(N_ACTIONS):
                     total = np.zeros(self.n_cells)
-                    for prob, next_cell, next_key, reward, success in self._model[
+                    for prob, next_cell, next_key, reward, success in self.model[
                         (has_key, action)
                     ]:
                         step_reward = reward
@@ -158,9 +167,13 @@ class ValueIterationAgent(BaseAgent):
             "algorithm": self.name,
             "reward_mode": self.env.reward_mode,
             "gamma": self.gamma,
+            "theta": self.theta,
+            "iterations": self.max_energy,
             "energy_sweeps": self.max_energy,
+            "converged": bool(residual < max(self.theta, 1e-8)),
             "states_evaluated": int(self.n_cells * 2 * self.max_energy),
             "train_seconds": elapsed,
+            "memory_kilobytes": round(self.memory_bytes / 1024, 1),
             "bellman_residual": residual,
             "max_delta_per_sweep": deltas,
             "start_state_value": float(
@@ -224,6 +237,10 @@ class ValueIterationAgent(BaseAgent):
 
     # -------------------------------------------------------------- persistence
 
+    @property
+    def memory_bytes(self) -> int:
+        return int(self.values.nbytes + self.policy.nbytes)
+
     def hyperparameters(self) -> dict:
         return {
             "algorithm": self.name,
@@ -232,6 +249,9 @@ class ValueIterationAgent(BaseAgent):
             "reward_mode": self.env.reward_mode,
             "max_energy": self.max_energy,
             "n_cells": self.n_cells,
+            "value_table_shape": list(self.values.shape),
+            "value_table_kilobytes": round(self.values.nbytes / 1024, 1),
+            "memory_kilobytes": round(self.memory_bytes / 1024, 1),
         }
 
     def save(self, path) -> Path:

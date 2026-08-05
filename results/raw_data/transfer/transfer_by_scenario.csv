@@ -1,0 +1,13 @@
+variant,scenario,zero_shot_success,zero_shot_key_rate,early_success,final_success,episodes_to_threshold,final_success_std,jumpstart_delta,early_delta,final_delta,speed_delta,verdict
+different,full,0.0,0.0,0.007,0.795,1000.0,0.445,0.0,0.007,0.026,1000.0,positive
+different,scaled_0.25,0.0,0.0,0.056,0.979,1220.0,0.034,0.0,0.056,0.21,780.0,positive
+different,scaled_0.5,0.0,0.0,0.027,0.805,1260.0,0.225,0.0,0.027,0.036,740.0,positive
+different,scaled_0.75,0.0,0.0,0.042,0.951,1340.0,0.051,0.0,0.042,0.182,660.0,positive
+different,scratch,0.0,0.0,0.0,0.769,2000.0,0.287,0.0,0.0,0.0,0.0,neutral
+different,selective,0.0,0.0,0.009,0.755,1140.0,0.424,0.0,0.009,-0.015,860.0,positive
+similar,full,0.0,0.0,0.0,0.8,960.0,0.447,0.0,0.0,-0.199,480.0,negative
+similar,scaled_0.25,0.0,0.0,0.0,1.0,1040.0,0.0,0.0,0.0,0.001,400.0,positive
+similar,scaled_0.5,0.0,0.0,0.0,0.998,980.0,0.003,0.0,0.0,-0.001,460.0,positive
+similar,scaled_0.75,0.0,0.0,0.0,0.758,1100.0,0.346,0.0,0.0,-0.241,340.0,negative
+similar,scratch,0.0,0.0,0.0,0.999,1440.0,0.003,0.0,0.0,0.0,0.0,neutral
+similar,selective,0.0,0.0,0.0,0.971,1880.0,0.062,0.0,0.0,-0.028,-440.0,negative

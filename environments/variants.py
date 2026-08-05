@@ -22,6 +22,7 @@ regenerated from the next seed.
 
 from __future__ import annotations
 
+import heapq
 import math
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
@@ -59,10 +60,116 @@ def protected_cells(env: MazeEnv) -> Set[Coord]:
                 continue
             if 0 <= neighbour[0] < env.rows and 0 <= neighbour[1] < env.cols:
                 protected.add(neighbour)
+
+    # The door's own neighbours are frozen too, otherwise a flip can wall off the
+    # approach to the door and leave the vault unreachable from any direction.
+    for dr, dc in DELTAS.values():
+        neighbour = (env.door[0] + dr, env.door[1] + dc)
+        if 0 <= neighbour[0] < env.rows and 0 <= neighbour[1] < env.cols:
+            protected.add(neighbour)
     return protected
 
 
-def _validate(grid: np.ndarray, start: Coord, key: Coord, goal: Coord) -> Tuple[bool, str]:
+def sealed_cells(env: MazeEnv) -> Set[Coord]:
+    """The vault and its wall frontier: cells a repair corridor must never touch."""
+    vault = {tuple(cell) for cell in env.metadata.get("vault_cells", [])}
+    sealed = set(vault)
+    for row, col in vault:
+        for dr, dc in DELTAS.values():
+            neighbour = (row + dr, col + dc)
+            if neighbour in vault or neighbour == env.door:
+                continue
+            if 0 <= neighbour[0] < env.rows and 0 <= neighbour[1] < env.cols:
+                sealed.add(neighbour)
+    return sealed
+
+
+def door_approach(env: MazeEnv) -> Coord:
+    """The open cell just outside the door, which the agent must be able to reach."""
+    vault = {tuple(cell) for cell in env.metadata.get("vault_cells", [])}
+    for dr, dc in DELTAS.values():
+        neighbour = (env.door[0] + dr, env.door[1] + dc)
+        if neighbour in vault:
+            continue
+        if not (0 <= neighbour[0] < env.rows and 0 <= neighbour[1] < env.cols):
+            continue
+        if env.grid[neighbour] != Cell.WALL:
+            return neighbour
+    raise VariantError("the source door has no open approach cell")
+
+
+def _bridge(grid: np.ndarray, start: Coord, target: Coord, sealed: Set[Coord]) -> bool:
+    """Reconnect ``target`` to ``start`` by opening as few walls as possible.
+
+    A shortest-path search where stepping onto open floor is free and breaking
+    through a wall costs one. The cheapest route is therefore the thinnest wall
+    between the two components, which keeps the corridor structure of the maze
+    intact instead of cutting a straight highway across it.
+    """
+    rows, cols = grid.shape
+    reachable = bfs_distances(grid, [start], door_passable=False) >= 0
+    cost = np.full((rows, cols), np.inf)
+    previous: Dict[Coord, Optional[Coord]] = {}
+    queue: List[Tuple[int, Coord]] = []
+
+    for row, col in zip(*np.where(reachable)):
+        cell = (int(row), int(col))
+        cost[cell] = 0.0
+        previous[cell] = None
+        heapq.heappush(queue, (0, cell))
+
+    while queue:
+        spent, cell = heapq.heappop(queue)
+        if spent > cost[cell]:
+            continue
+        if cell == target:
+            break
+        for dr, dc in DELTAS.values():
+            neighbour = (cell[0] + dr, cell[1] + dc)
+            if not (0 <= neighbour[0] < rows and 0 <= neighbour[1] < cols):
+                continue
+            if neighbour in sealed or grid[neighbour] == Cell.DOOR:
+                continue
+            step = 1 if grid[neighbour] == Cell.WALL else 0
+            if spent + step < cost[neighbour]:
+                cost[neighbour] = spent + step
+                previous[neighbour] = cell
+                heapq.heappush(queue, (spent + step, neighbour))
+
+    if not np.isfinite(cost[target]):
+        return False
+
+    cell: Optional[Coord] = target
+    while cell is not None:
+        if grid[cell] == Cell.WALL:
+            grid[cell] = Cell.PATH
+        cell = previous.get(cell)
+    return True
+
+
+def _repair(
+    grid: np.ndarray, start: Coord, targets: Sequence[Coord], sealed: Set[Coord]
+) -> bool:
+    """Reconnect anything the flips cut off.
+
+    Closing a few dozen open cells at random disconnects the maze more often than
+    not, so rejecting every such layout would need an unreasonable number of
+    attempts. Punching through the thinnest dividing wall is cheaper and leaves
+    the rest of the perturbation intact.
+    """
+    for target in targets:
+        if bfs_distances(grid, [start], door_passable=False)[target] >= 0:
+            continue
+        if not _bridge(grid, start, target, sealed):
+            return False
+    return True
+
+
+def _validate(
+    grid: np.ndarray, start: Coord, key: Coord, goal: Coord, door: Coord
+) -> Tuple[bool, str]:
+    if grid[door] != Cell.DOOR:
+        return False, "the door cell no longer holds a door"
     shut = bfs_distances(grid, [start], door_passable=False)
     if shut[key] < 0:
         return False, "key unreachable with the door shut"
@@ -120,10 +227,19 @@ def _relocate_key(
     if not candidates:
         raise VariantError("nowhere to move the key")
 
-    # Prefer the far half of the maze so the task really changes.
+    # Prefer the far end of the maze, so the route to the key genuinely changes
+    # rather than the key landing next to the door.
     candidates.sort(key=lambda cell: -int(reachable[cell]))
-    pool = candidates[: max(1, len(candidates) // 3)]
+    pool = candidates[: max(1, len(candidates) // 6)]
     return pool[int(rng.integers(len(pool)))]
+
+
+def _open_cells(grid: np.ndarray, protected: Set[Coord]) -> List[Coord]:
+    return [
+        (int(r), int(c))
+        for r, c in sorted(zip(*np.where(grid == Cell.PATH)))
+        if (int(r), int(c)) not in protected
+    ]
 
 
 def _add_penalties(
@@ -161,6 +277,8 @@ def make_variant(
         raise KeyError(f"unknown variant {variant!r}; choose from {VARIANTS}")
     settings = VARIANT_SETTINGS[variant]
     protected = protected_cells(source)
+    sealed = sealed_cells(source)
+    approach = door_approach(source)
     n_cells = source.rows * source.cols
     target_changes = int(round(settings["change_fraction"] * n_cells))
 
@@ -168,7 +286,7 @@ def make_variant(
     for attempt in range(max_attempts):
         rng = np.random.default_rng(seed + attempt)
         grid = source.grid.copy()
-        start, key, goal, door = source.start, source.key, source.door, source.goal
+        start, key, door, goal = source.start, source.key, source.door, source.goal
 
         # Strip decorations back to plain floor so flips work on a clean grid.
         grid[grid == Cell.PENALTY] = Cell.PATH
@@ -179,13 +297,29 @@ def make_variant(
             changed = _apply_flips(grid, rng, protected, target_changes)
             penalties = list(source.penalties)
 
+            # Reconnect first, so the key is then placed using real distances on
+            # the layout the agent will actually see.
+            if not _repair(grid, start, [approach], sealed):
+                failures.append(f"seed {seed + attempt}: could not reconnect the door")
+                continue
+
             if settings["move_key"]:
                 grid[key] = Cell.PATH
                 key = _relocate_key(grid, rng, start, protected | {goal, door})
-                extra = _add_penalties(
-                    grid, rng, settings["extra_penalties"], start, key, goal, door
+
+            if not _repair(grid, start, [key], sealed):
+                failures.append(f"seed {seed + attempt}: could not reconnect the key")
+                continue
+
+            if settings["move_key"]:
+                penalties = sorted(
+                    set(penalties)
+                    | set(
+                        _add_penalties(
+                            grid, rng, settings["extra_penalties"], start, key, goal, door
+                        )
+                    )
                 )
-                penalties = sorted(set(penalties) | set(extra))
 
             # Penalty cells only survive where the cell is still open floor.
             penalties = [
@@ -198,7 +332,7 @@ def make_variant(
                     | set(_add_penalties(grid, rng, 5 - len(penalties), start, key, goal, door))
                 )
 
-            ok, reason = _validate(grid, start, key, goal)
+            ok, reason = _validate(grid, start, key, goal, door)
             if not ok:
                 failures.append(f"seed {seed + attempt}: {reason}")
                 continue
@@ -243,11 +377,12 @@ def _finalise(
         max_steps, max(math.ceil(energy_slack * optimal_path), optimal_path + 20)
     )
 
-    grid[start] = Cell.START
-    grid[key] = Cell.KEY
-    grid[goal] = Cell.GOAL
     for cell in penalties:
         grid[cell] = Cell.PENALTY
+    grid[door] = Cell.DOOR
+    grid[goal] = Cell.GOAL
+    grid[key] = Cell.KEY
+    grid[start] = Cell.START
 
     cells_changed = int(
         ((source.grid == Cell.WALL) != (grid == Cell.WALL)).sum()
@@ -307,20 +442,21 @@ def obstacle_difference(source: MazeEnv, target: MazeEnv) -> np.ndarray:
 def unchanged_neighbourhood_mask(
     source: MazeEnv, target: MazeEnv, radius: int = 1
 ) -> np.ndarray:
-    """True where the cell and its whole (2r+1)^2 neighbourhood are identical.
+    """True where a cell and the cells it can move into are all unchanged.
 
-    This is the mask that selective transfer uses: a Q-value is only worth
-    keeping if the local geometry that produced it still looks the same.
+    This is the mask selective transfer uses. The neighbourhood is the cross of
+    cells within ``radius`` steps rather than the full square block, because that
+    is exactly what determines the outcome of an action from this cell: diagonal
+    walls never affect where the agent ends up, so counting them would discard
+    Q-values that are still perfectly valid.
     """
-    source_wall = source.grid == Cell.WALL
-    target_wall = target.grid == Cell.WALL
-    rows, cols = source_wall.shape
-    mask = np.zeros((rows, cols), dtype=bool)
+    changed = (source.grid == Cell.WALL) != (target.grid == Cell.WALL)
+    rows, cols = changed.shape
+    dirty = changed.copy()
 
-    for row in range(rows):
-        for col in range(cols):
-            r0, r1 = max(0, row - radius), min(rows, row + radius + 1)
-            c0, c1 = max(0, col - radius), min(cols, col + radius + 1)
-            if np.array_equal(source_wall[r0:r1, c0:c1], target_wall[r0:r1, c0:c1]):
-                mask[row, col] = True
-    return mask
+    for step in range(1, radius + 1):
+        dirty[step:, :] |= changed[: rows - step, :]
+        dirty[: rows - step, :] |= changed[step:, :]
+        dirty[:, step:] |= changed[:, : cols - step]
+        dirty[:, : cols - step] |= changed[:, step:]
+    return ~dirty

@@ -2,12 +2,12 @@
 
 Everything is drawn with vector primitives, so the GUI needs no image assets and
 cannot break because a file is missing. The renderer is stateless: it draws
-whatever environment and overlays it is handed.
+whatever environment, overlays and readouts it is handed.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pygame
@@ -19,6 +19,7 @@ PANEL_BG = (32, 35, 43)
 PANEL_LINE = (58, 62, 74)
 TEXT = (226, 230, 238)
 TEXT_DIM = (146, 154, 170)
+ACCENT = (0, 158, 175)
 
 COLORS: Dict[int, Tuple[int, int, int]] = {
     Cell.PATH: (238, 239, 241),
@@ -33,6 +34,9 @@ AGENT_COLOR = (231, 76, 118)
 TRAIL_COLOR = (120, 180, 220)
 DOOR_OPEN = (150, 196, 138)
 ARROW_COLOR = (70, 80, 100)
+SUCCESS_COLOR = (123, 192, 67)
+FAILURE_COLOR = (238, 64, 53)
+BUMP_COLOR = (255, 214, 102)
 
 LEGEND = (
     ("start", Cell.START),
@@ -45,6 +49,12 @@ LEGEND = (
 
 ARROW_VECTORS = {0: (0, -1), 1: (1, 0), 2: (0, 1), 3: (-1, 0)}
 
+OUTCOME_TEXT = {
+    "success": ("EPISODE SOLVED", SUCCESS_COLOR),
+    "out_of_energy": ("FAILED -- OUT OF ENERGY", FAILURE_COLOR),
+    "max_steps": ("FAILED -- STEP LIMIT", FAILURE_COLOR),
+}
+
 
 def font(size: int, bold: bool = False) -> pygame.font.Font:
     try:
@@ -54,7 +64,7 @@ def font(size: int, bold: bool = False) -> pygame.font.Font:
 
 
 class MazeRenderer:
-    def __init__(self, env, cell_size: int = 34, panel_width: int = 330, margin: int = 16):
+    def __init__(self, env, cell_size: int = 32, panel_width: int = 372, margin: int = 14):
         self.cell_size = cell_size
         self.panel_width = panel_width
         self.margin = margin
@@ -74,7 +84,7 @@ class MazeRenderer:
     @property
     def window_size(self) -> Tuple[int, int]:
         width = self.maze_width + self.panel_width + 3 * self.margin
-        height = max(self.maze_height + 2 * self.margin, 620)
+        height = max(self.maze_height + 2 * self.margin + 34, 760)
         return width, height
 
     def cell_rect(self, row: int, col: int) -> pygame.Rect:
@@ -100,15 +110,21 @@ class MazeRenderer:
         trail: Optional[Sequence[Tuple[int, int]]] = None,
         value_grid: Optional[np.ndarray] = None,
         policy_grid: Optional[np.ndarray] = None,
-        hud_lines: Sequence[Tuple[str, str]] = (),
+        sections: Sequence[Tuple[str, Sequence[Tuple[str, object]]]] = (),
         status: str = "",
+        progress: Optional[Tuple[float, str]] = None,
+        bump_cell: Optional[Tuple[int, int]] = None,
+        controls: Sequence[str] = (),
     ) -> None:
         surface.fill(BACKGROUND)
         self._draw_maze(surface, env, value_grid, policy_grid)
         if trail:
             self._draw_trail(surface, trail)
+        if bump_cell is not None:
+            self._draw_bump(surface, bump_cell)
         self._draw_agent(surface, env)
-        self._draw_panel(surface, env, hud_lines, status)
+        self._draw_outcome_banner(surface, env)
+        self._draw_panel(surface, env, sections, status, progress, controls)
 
     def _draw_maze(self, surface, env, value_grid, policy_grid) -> None:
         normalised = self._normalise(value_grid)
@@ -196,6 +212,11 @@ class MazeRenderer:
             )
             pygame.draw.circle(surface, colour, rect.center, size // 2)
 
+    def _draw_bump(self, surface, cell: Tuple[int, int]) -> None:
+        """Flash the cell the agent just failed to leave."""
+        rect = self.cell_rect(*cell)
+        pygame.draw.rect(surface, BUMP_COLOR, rect.inflate(2, 2), 3)
+
     def _draw_agent(self, surface, env) -> None:
         rect = self.cell_rect(*env.agent_pos)
         radius = self.cell_size // 2 - 5
@@ -204,96 +225,158 @@ class MazeRenderer:
         if env.has_key:
             pygame.draw.circle(surface, COLORS[Cell.KEY], rect.center, max(2, radius // 3))
 
+    def _draw_outcome_banner(self, surface, env) -> None:
+        if not env.done or env.outcome not in OUTCOME_TEXT:
+            return
+        label, colour = OUTCOME_TEXT[env.outcome]
+        text = self.get_font(17, bold=True).render(label, True, colour)
+        box = pygame.Rect(
+            self.margin, self.margin + self.maze_height + 6, self.maze_width, 26
+        )
+        pygame.draw.rect(surface, PANEL_BG, box, border_radius=5)
+        pygame.draw.rect(surface, colour, box, 1, border_radius=5)
+        surface.blit(text, (box.centerx - text.get_width() // 2, box.y + 4))
+
     # ------------------------------------------------------------------ panel
 
-    def _draw_panel(self, surface, env, hud_lines, status: str) -> None:
+    def _draw_panel(self, surface, env, sections, status, progress, controls) -> None:
         left = self.margin * 2 + self.maze_width
-        panel = pygame.Rect(left, self.margin, self.panel_width, surface.get_height() - 2 * self.margin)
+        panel = pygame.Rect(
+            left, self.margin, self.panel_width, surface.get_height() - 2 * self.margin
+        )
         pygame.draw.rect(surface, PANEL_BG, panel, border_radius=8)
         pygame.draw.rect(surface, PANEL_LINE, panel, 1, border_radius=8)
 
-        x = panel.x + 16
-        y = panel.y + 14
-        title = self.get_font(19, bold=True).render("RL Maze Solver", True, TEXT)
+        x = panel.x + 15
+        y = panel.y + 12
+        title = self.get_font(18, bold=True).render("RL Maze Solver", True, TEXT)
         surface.blit(title, (x, y))
-        y += 30
+        y += 25
 
         if status:
             for line in status.split("\n"):
-                surface.blit(self.get_font(14).render(line, True, TEXT_DIM), (x, y))
-                y += 19
+                surface.blit(self.get_font(12).render(line, True, TEXT_DIM), (x, y))
+                y += 16
+        y += 4
+
+        if progress is not None:
+            y = self._draw_progress(surface, panel, x, y, *progress)
+
+        y = self._draw_energy_bar(surface, env, panel, x, y)
         y += 6
 
-        label_font = self.get_font(14)
-        value_font = self.get_font(14, bold=True)
-        for label, value in hud_lines:
-            surface.blit(label_font.render(label, True, TEXT_DIM), (x, y))
-            rendered = value_font.render(str(value), True, TEXT)
-            surface.blit(rendered, (panel.right - 16 - rendered.get_width(), y))
-            y += 21
+        for heading, rows in sections:
+            if y > panel.bottom - 40:
+                break
+            surface.blit(self.get_font(12, bold=True).render(heading, True, ACCENT), (x, y))
+            y += 17
+            for label, value in rows:
+                if y > panel.bottom - 26:
+                    break
+                surface.blit(self.get_font(12).render(label, True, TEXT_DIM), (x, y))
+                rendered = self.get_font(12, bold=True).render(str(value), True, TEXT)
+                surface.blit(rendered, (panel.right - 15 - rendered.get_width(), y))
+                y += 16
+            y += 6
 
-        y += 10
-        y = self._draw_energy_bar(surface, env, panel, x, y)
-        y += 14
         y = self._draw_legend(surface, panel, x, y)
-        self._draw_controls(surface, panel, x, y + 10)
+        self._draw_controls(surface, panel, x, y + 4, controls)
+
+    def _draw_progress(self, surface, panel, x: int, y: int, fraction: float, label: str) -> int:
+        surface.blit(self.get_font(12).render(label, True, TEXT_DIM), (x, y))
+        y += 16
+        width = panel.width - 30
+        track = pygame.Rect(x, y, width, 9)
+        pygame.draw.rect(surface, (48, 52, 64), track, border_radius=5)
+        fraction = float(np.clip(fraction, 0.0, 1.0))
+        if fraction > 0:
+            pygame.draw.rect(
+                surface, ACCENT, pygame.Rect(x, y, max(3, int(width * fraction)), 9),
+                border_radius=5,
+            )
+        pygame.draw.rect(surface, PANEL_LINE, track, 1, border_radius=5)
+        return y + 18
 
     def _draw_energy_bar(self, surface, env, panel, x: int, y: int) -> int:
-        surface.blit(self.get_font(13).render("energy", True, TEXT_DIM), (x, y))
-        y += 18
-        width = panel.width - 32
-        track = pygame.Rect(x, y, width, 14)
-        pygame.draw.rect(surface, (48, 52, 64), track, border_radius=7)
+        surface.blit(self.get_font(12).render("energy remaining", True, TEXT_DIM), (x, y))
+        y += 16
+        width = panel.width - 30
+        track = pygame.Rect(x, y, width, 13)
+        pygame.draw.rect(surface, (48, 52, 64), track, border_radius=6)
         fraction = env.energy / env.max_energy if env.max_energy else 0.0
         if fraction > 0:
-            filled = pygame.Rect(x, y, max(3, int(width * fraction)), 14)
             colour = (
                 (238, 64, 53) if fraction < 0.2
                 else (242, 177, 52) if fraction < 0.5
                 else (123, 192, 67)
             )
-            pygame.draw.rect(surface, colour, filled, border_radius=7)
-        pygame.draw.rect(surface, PANEL_LINE, track, 1, border_radius=7)
-        text = self.get_font(12).render(
-            f"{env.energy} / {env.max_energy}", True, TEXT
-        )
-        surface.blit(text, (x + width - text.get_width(), y + 17))
-        return y + 34
+            pygame.draw.rect(
+                surface, colour, pygame.Rect(x, y, max(3, int(width * fraction)), 13),
+                border_radius=6,
+            )
+        pygame.draw.rect(surface, PANEL_LINE, track, 1, border_radius=6)
+        text = self.get_font(11).render(f"{env.energy} / {env.max_energy}", True, TEXT)
+        surface.blit(text, (x + width - text.get_width(), y + 15))
+        return y + 32
 
     def _draw_legend(self, surface, panel, x: int, y: int) -> int:
-        surface.blit(self.get_font(13).render("legend", True, TEXT_DIM), (x, y))
-        y += 20
+        if y > panel.bottom - 70:
+            return y
+        surface.blit(self.get_font(12, bold=True).render("legend", True, ACCENT), (x, y))
+        y += 17
         for index, (label, cell) in enumerate(LEGEND):
             column = index % 2
             row = index // 2
             cx = x + column * (panel.width // 2 - 8)
-            cy = y + row * 22
-            swatch = pygame.Rect(cx, cy, 12, 12)
-            pygame.draw.rect(surface, COLORS[cell], swatch, border_radius=2)
-            surface.blit(self.get_font(12).render(label, True, TEXT_DIM), (cx + 18, cy - 1))
-        return y + ((len(LEGEND) + 1) // 2) * 22
+            cy = y + row * 18
+            pygame.draw.rect(surface, COLORS[cell], pygame.Rect(cx, cy, 11, 11), border_radius=2)
+            surface.blit(self.get_font(11).render(label, True, TEXT_DIM), (cx + 16, cy - 1))
+        return y + ((len(LEGEND) + 1) // 2) * 18 + 4
 
-    def _draw_controls(self, surface, panel, x: int, y: int) -> None:
-        lines = [
-            "space  play / pause",
-            "n      single step",
-            "r      reset episode",
-            "1 2 3  VI / Q-learn / SARSA",
-            "m      sparse <-> shaped",
-            "v      value heat map",
-            "p      policy arrows",
-            "t      trail",
-            "+ -    speed",
-            "c      record frames",
-            "esc    quit",
-        ]
-        surface.blit(self.get_font(13).render("controls", True, TEXT_DIM), (x, y))
-        y += 19
-        for line in lines:
-            if y > panel.bottom - 18:
+    def _draw_controls(self, surface, panel, x: int, y: int, controls: Sequence[str]) -> None:
+        if not controls or y > panel.bottom - 30:
+            return
+        surface.blit(self.get_font(12, bold=True).render("controls", True, ACCENT), (x, y))
+        y += 16
+        for line in controls:
+            if y > panel.bottom - 16:
                 break
-            surface.blit(self.get_font(12).render(line, True, TEXT_DIM), (x, y))
-            y += 17
+            surface.blit(self.get_font(11).render(line, True, TEXT_DIM), (x, y))
+            y += 14
+
+    # ------------------------------------------------------------------ gallery
+
+    def draw_gallery(
+        self,
+        surface: pygame.Surface,
+        image: Optional[pygame.Surface],
+        caption: str,
+        index: int,
+        total: int,
+        hint: str,
+    ) -> None:
+        """Full-window viewer for the saved figures."""
+        surface.fill(BACKGROUND)
+        width, height = surface.get_size()
+        header = self.get_font(15, bold=True).render(
+            f"saved results  [{index + 1}/{total}]" if total else "no figures found",
+            True, TEXT,
+        )
+        surface.blit(header, (self.margin, 10))
+        surface.blit(self.get_font(12).render(caption, True, TEXT_DIM), (self.margin, 32))
+        surface.blit(self.get_font(12).render(hint, True, TEXT_DIM), (self.margin, height - 24))
+
+        if image is None:
+            return
+        area = pygame.Rect(self.margin, 54, width - 2 * self.margin, height - 90)
+        scale = min(area.width / image.get_width(), area.height / image.get_height(), 1.0)
+        scaled = pygame.transform.smoothscale(
+            image, (int(image.get_width() * scale), int(image.get_height() * scale))
+        )
+        surface.blit(
+            scaled,
+            (area.centerx - scaled.get_width() // 2, area.centery - scaled.get_height() // 2),
+        )
 
     # ----------------------------------------------------------------- helpers
 

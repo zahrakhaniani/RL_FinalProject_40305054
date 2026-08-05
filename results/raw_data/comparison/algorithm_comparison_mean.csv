@@ -1,0 +1,7 @@
+reward_mode,algorithm,success_rate,mean_return,mean_steps_when_solved,mean_penalty_entries,policy_agreement,weighted_policy_agreement,train_seconds,memory_kilobytes,late_return_std
+shaped,q_learning,1.0,97.722,174.099,3.143,0.533,0.658,6.225,132.0,10.952
+shaped,sarsa_lambda,1.0,98.274,177.439,3.079,0.442,0.556,7.32,132.0,11.308
+shaped,value_iteration,1.0,108.635,116.703,4.2,1.0,1.0,0.024,548.2,
+sparse,q_learning,0.011,-0.174,199.3,14.316,0.309,0.335,6.814,132.0,16.856
+sparse,sarsa_lambda,0.983,98.326,199.682,5.255,0.347,0.389,7.74,132.0,24.018
+sparse,value_iteration,1.0,104.17,116.6,4.2,1.0,1.0,0.024,548.2,

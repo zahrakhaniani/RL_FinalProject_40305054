@@ -1,0 +1,186 @@
+{
+  "run": {
+    "timestamp_utc": "2026-07-29T22:28:37+00:00",
+    "config_file": "experiments/configs/default.json",
+    "config_hash": "4a77b6e251",
+    "python": "3.13.9",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3"
+  },
+  "gammas": [
+    0.9,
+    0.95,
+    0.99
+  ],
+  "records": [
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "sparse",
+      "gamma": 0.9,
+      "seed": null,
+      "label": "sparse_gamma0.9",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 7.105427357601002e-15,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.02406020000034914,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 1.0,
+        "key_rate": 1.0,
+        "mean_return": 104.17,
+        "std_return": 0.3442140806726708,
+        "mean_steps": 116.6,
+        "mean_steps_when_solved": 116.6,
+        "mean_energy_left": 108.4,
+        "mean_wall_collisions": 19.22,
+        "mean_penalty_entries": 4.2,
+        "outcomes": {
+          "success": 300
+        }
+      }
+    },
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "sparse",
+      "gamma": 0.95,
+      "seed": null,
+      "label": "sparse_gamma0.95",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 1.4210854715202004e-14,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.023944500000652624,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 1.0,
+        "key_rate": 1.0,
+        "mean_return": 104.17,
+        "std_return": 0.3442140806726708,
+        "mean_steps": 116.6,
+        "mean_steps_when_solved": 116.6,
+        "mean_energy_left": 108.4,
+        "mean_wall_collisions": 19.22,
+        "mean_penalty_entries": 4.2,
+        "outcomes": {
+          "success": 300
+        }
+      }
+    },
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "sparse",
+      "gamma": 0.99,
+      "seed": null,
+      "label": "sparse_gamma0.99",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 1.4210854715202004e-14,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.02405079999971349,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 1.0,
+        "key_rate": 1.0,
+        "mean_return": 104.17,
+        "std_return": 0.3442140806726708,
+        "mean_steps": 116.6,
+        "mean_steps_when_solved": 116.6,
+        "mean_energy_left": 108.4,
+        "mean_wall_collisions": 19.22,
+        "mean_penalty_entries": 4.2,
+        "outcomes": {
+          "success": 300
+        }
+      }
+    },
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "shaped",
+      "gamma": 0.9,
+      "seed": null,
+      "label": "shaped_gamma0.9",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 7.105427357601002e-15,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.023998899999241985,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 0.0,
+        "key_rate": 0.0,
+        "mean_return": -54.386666666666706,
+        "std_return": 5.005962001009891,
+        "mean_steps": 225.0,
+        "mean_steps_when_solved": NaN,
+        "mean_energy_left": 0.0,
+        "mean_wall_collisions": 25.76,
+        "mean_penalty_entries": 0.0,
+        "outcomes": {
+          "out_of_energy": 300
+        }
+      }
+    },
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "shaped",
+      "gamma": 0.95,
+      "seed": null,
+      "label": "shaped_gamma0.95",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 1.4210854715202004e-14,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.02400229999966541,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 1.0,
+        "key_rate": 1.0,
+        "mean_return": 112.89683333333332,
+        "std_return": 8.578336958421605,
+        "mean_steps": 131.79666666666665,
+        "mean_steps_when_solved": 131.79666666666665,
+        "mean_energy_left": 93.20333333333333,
+        "mean_wall_collisions": 21.73,
+        "mean_penalty_entries": 2.6566666666666667,
+        "outcomes": {
+          "success": 300
+        }
+      }
+    },
+    {
+      "algorithm": "value_iteration",
+      "reward_mode": "shaped",
+      "gamma": 0.99,
+      "seed": null,
+      "label": "shaped_gamma0.99",
+      "episodes": 0,
+      "iterations": 225,
+      "theta": 1e-10,
+      "bellman_residual": 1.4210854715202004e-14,
+      "memory_kilobytes": 548.2,
+      "train_seconds": 0.023926200000460085,
+      "final_eval": {
+        "episodes": 300,
+        "success_rate": 1.0,
+        "key_rate": 1.0,
+        "mean_return": 108.63483333333332,
+        "std_return": 9.583766394563023,
+        "mean_steps": 116.70333333333333,
+        "mean_steps_when_solved": 116.70333333333333,
+        "mean_energy_left": 108.29666666666667,
+        "mean_wall_collisions": 19.03,
+        "mean_penalty_entries": 4.2,
+        "outcomes": {
+          "success": 300
+        }
+      }
+    }
+  ]
+}

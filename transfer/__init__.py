@@ -1,15 +1,19 @@
-"""Transfer learning between two mazes."""
+"""Transfer learning between the source maze and its perturbed targets."""
 
 from .transfer_learning import (
-    PolicyReuseAgent,
-    build_target_env,
-    ensure_target_map,
+    build_initial_q,
+    classify_transfer,
+    ensure_targets,
     run_transfer_study,
+    scenario_specs,
+    train_source,
 )
 
 __all__ = [
-    "PolicyReuseAgent",
-    "build_target_env",
-    "ensure_target_map",
+    "build_initial_q",
+    "classify_transfer",
+    "ensure_targets",
     "run_transfer_study",
+    "scenario_specs",
+    "train_source",
 ]

@@ -1,0 +1,7 @@
+algorithm,reward_mode,seed,label,episodes,success_rate,key_rate,mean_return,std_return,mean_steps,mean_steps_when_solved,mean_energy_left,mean_wall_collisions,mean_penalty_entries,episodes_to_threshold,late_eval_success_std,late_return_std,memory_kilobytes,train_seconds,epsilon_schedule
+q_learning,sparse,1,sparse_eps-exponential_seed1,3000,0.05,1.0,3.791000000000018,21.973254629207755,224.18,208.6,0.82,100.27333333333333,12.626666666666667,,0.013333333333333332,32.860303098876,132.0,6.808490599999459,exponential
+q_learning,sparse,2,sparse_eps-exponential_seed2,3000,0.0,1.0,-1.2499999999999822,0.0,225.0,,0.0,112.02,30.243333333333332,,0.0,7.071001409807525,132.0,6.904943999999887,exponential
+q_learning,sparse,3,sparse_eps-exponential_seed3,3000,0.0,1.0,-1.2499999999999822,0.0,225.0,,0.0,107.32333333333334,11.523333333333333,,0.0,10.064302894388662,132.0,6.8713149000004705,exponential
+q_learning,sparse,1,sparse_eps-linear_seed1,3000,0.0,1.0,-1.2499999999999822,0.0,225.0,,0.0,112.53,9.253333333333334,,0.0,0.7053367989832972,132.0,6.664110499999879,linear
+q_learning,sparse,2,sparse_eps-linear_seed2,3000,0.0,1.0,-1.2499999999999822,0.0,225.0,,0.0,99.77666666666667,14.1,,0.0,0.0,132.0,6.638462300000356,linear
+q_learning,sparse,3,sparse_eps-linear_seed3,3000,0.0,1.0,-1.2499999999999822,0.0,225.0,,0.0,87.76333333333334,8.606666666666667,,0.0,0.0,132.0,6.657865299999685,linear
