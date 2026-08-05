@@ -67,6 +67,11 @@ deactivate
 python main.py
 ```
 
+### Run GUI -> you can actually play or run an agent to solve it for you + compare all agents 
+```bash
+python gui/app.py
+```
+
 ### Run experiments
 ```bash
 python experiments/run_experiments.py
