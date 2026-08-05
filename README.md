@@ -82,34 +82,6 @@ pip install -r requirements.txt
 Only NumPy, pandas, Matplotlib and pygame are used. Run every command from the
 repository root; all paths in the code are relative to it.
 
-## Reproducing every result
-
-The commands below regenerate everything in `results/` from scratch. Each writes
-into its own per-algorithm subfolder, so the stages are independent and can be
-re-run individually.
-
-```bash
-python main.py info                        # config, maze stats, energy budgets
-python main.py generate                    # write environments/maps/maze_40305054.json
-python main.py test                        # unit tests
-
-python experiments/run_value_iteration.py  # optimal reference + gamma sweep
-python experiments/run_q_learning.py       # 2 reward modes x 5 seeds + epsilon-decay study
-python experiments/run_sarsa_lambda.py     # same, plus a lambda sweep per reward mode
-python experiments/run_comparison.py       # policy agreement vs Value Iteration
-python experiments/run_transfer.py         # 2 targets x 4 transfer scenarios
-python experiments/analysis.py             # all figures and comparison tables
-
-python experiments/run_experiments.py      # everything above in one go
-python experiments/run_experiments.py --quick        # tiny smoke run (~1 min)
-python experiments/run_experiments.py --skip-sweeps  # main runs only, no studies
-```
-
-`run_comparison.py` and `analysis.py` read saved models and raw data, so run them
-after the three algorithm stages. Every run is seeded, so repeating any command
-reproduces the same numbers. The maze is generated once and saved; all algorithms
-then load that same file.
-
 ## Interactive viewer / GUI
 
 ```bash
@@ -180,6 +152,34 @@ winget install ffmpeg
 ffmpeg -framerate 30 -i frame_%05d.png -pix_fmt yuv420p run.mp4
 ```
 
+
+## Reproducing results
+
+The commands below regenerate everything in `results/` from scratch. Each writes
+into its own per-algorithm subfolder, so the stages are independent and can be
+re-run individually.
+
+```bash
+python main.py info                        # config, maze stats, energy budgets
+python main.py generate                    # write environments/maps/maze_40305054.json
+python main.py test                        # unit tests
+
+python experiments/run_value_iteration.py  # optimal reference + gamma sweep
+python experiments/run_q_learning.py       # 2 reward modes x 5 seeds + epsilon-decay study
+python experiments/run_sarsa_lambda.py     # same, plus a lambda sweep per reward mode
+python experiments/run_comparison.py       # policy agreement vs Value Iteration
+python experiments/run_transfer.py         # 2 targets x 4 transfer scenarios
+python experiments/analysis.py             # all figures and comparison tables
+
+python experiments/run_experiments.py      # everything above in one go
+python experiments/run_experiments.py --quick        # tiny smoke run (~1 min)
+python experiments/run_experiments.py --skip-sweeps  # main runs only, no studies
+```
+
+`run_comparison.py` and `analysis.py` read saved models and raw data, so run them
+after the three algorithm stages. Every run is seeded, so repeating any command
+reproduces the same numbers. The maze is generated once and saved; all algorithms
+then load that same file.
 
 
 ## The environment
